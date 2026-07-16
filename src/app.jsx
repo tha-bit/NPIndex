@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
    CONFIG
    ============================================================ */
 const SUPABASE_URL = "https://yaqsnzcwbiwefpiojnih.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhcXNuemN3Yml3ZWZwaW9qbmloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwOTYwNTYsImV4cCI6MjA5ODY3MjA1Nn0.d33njOfbTMY7XnGZVNMBNwGNpiEnrDLm7MJYZI6DoCI";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhcXNuemN3Yml3ZWZwaW9qbmloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwOTYwNTYsImV4cCI6MjA5ODY3MjA1Nn0.d33njOfbTMY7XnGZVNMBNwGNpiEnrDLm7MJYZI6DoCI";
 const PAGE_SIZES = [20, 50, 100];
 
 /* ============================================================
@@ -96,7 +96,7 @@ function Header({ view, go }) {
           <span className="npx-brand-mark">NP</span>
           <span className="npx-brand-text">
             Noun Phrase Index
-            <span className="npx-brand-sub">a cross-linguistic noun phrase database</span>
+            <span className="npx-brand-sub">a cross-linguistic structure archive</span>
           </span>
         </button>
         <nav className="npx-nav">
@@ -121,31 +121,79 @@ function Header({ view, go }) {
 function Home({ go, languageById }) {
   const [stats, setStats] = useState(null);
   const [statsErr, setStatsErr] = useState(null);
-  const [hero, setHero] = useState(null);
 
+  // Hero carousel: pool of phrases + enriched current entry
+  const poolRef = useRef([]);
+  const [heroIdx, setHeroIdx] = useState(0);
+  const [hero, setHero] = useState(null);   // { phrase, tokens }
+  const [heroFade, setHeroFade] = useState(true);
+  const timerRef = useRef(null);
+
+  // Count only languages that actually have at least one phrase
   const loadStats = useCallback(async () => {
     setStatsErr(null);
     try {
-      const [lang, phr, tok] = await Promise.all([
-        sb("languages?select=language_id", { range: "0-0", count: true }),
+      const [phr, tok, langRows] = await Promise.all([
         sb("phrases?select=phrase_id", { range: "0-0", count: true }),
         sb("tokens?select=token_id", { range: "0-0", count: true }),
+        sb("phrases?select=language_id&limit=10000"),
       ]);
-      setStats({ languages: lang.total, phrases: phr.total, tokens: tok.total });
+      const activeLangs = new Set(langRows.data.map((r) => r.language_id)).size;
+      setStats({ languages: activeLangs, phrases: phr.total, tokens: tok.total });
     } catch (e) { setStatsErr(e.message); }
   }, []);
 
-  const loadHero = useCallback(async () => {
+  // Load a pool of phrases spread across languages, then enrich one-by-one on demand
+  const loadPool = useCallback(async () => {
     try {
-      const { data: sample } = await sb("phrases?select=phrase_id,phrase_main,phrase_translation,language_id,tag_sequence&limit=10&order=phrase_id.asc");
+      const { data: sample } = await sb(
+        "phrases?select=phrase_id,phrase_main,phrase_translation,language_id,tag_sequence&limit=100&order=language_id.asc"
+      );
       if (!sample?.length) return;
-      const pick = sample[Math.floor(Math.random() * sample.length)];
-      const { data: toks } = await sb(`tokens?select=token,gloss&phrase_id=eq.${enc(pick.phrase_id)}&order=token_id.asc`);
-      setHero({ phrase: pick, tokens: toks });
+      // Shuffle so different languages interleave
+      const shuffled = sample.slice().sort(() => Math.random() - 0.5);
+      poolRef.current = shuffled;
+      setHeroIdx(0);
     } catch (_) {}
   }, []);
 
-  useEffect(() => { loadStats(); loadHero(); }, [loadStats, loadHero]);
+  // Fetch tokens for whichever phrase is current
+  const loadTokens = useCallback(async (phrase) => {
+    try {
+      const { data: toks } = await sb(
+        `tokens?select=token,gloss&phrase_id=eq.${enc(phrase.phrase_id)}&order=token_id.asc`
+      );
+      setHero({ phrase, tokens: toks });
+    } catch (_) {
+      setHero({ phrase, tokens: [] });
+    }
+  }, []);
+
+  // Advance to the next card with a fade
+  const advance = useCallback(() => {
+    setHeroFade(false);
+    setTimeout(() => {
+      setHeroIdx((i) => {
+        const next = poolRef.current.length ? (i + 1) % poolRef.current.length : 0;
+        return next;
+      });
+      setHeroFade(true);
+    }, 300);
+  }, []);
+
+  useEffect(() => { loadStats(); loadPool(); }, [loadStats, loadPool]);
+
+  // When heroIdx changes, load tokens for that phrase
+  useEffect(() => {
+    const phrase = poolRef.current[heroIdx];
+    if (phrase) loadTokens(phrase);
+  }, [heroIdx, loadTokens]);
+
+  // Auto-rotate every 3 seconds
+  useEffect(() => {
+    timerRef.current = setInterval(advance, 5000);
+    return () => clearInterval(timerRef.current);
+  }, [advance]);
 
   const heroLang = hero && languageById[hero.phrase.language_id];
 
@@ -153,21 +201,39 @@ function Home({ go, languageById }) {
     <div className="npx-page">
       <section className="npx-hero">
         <div className="npx-hero-text">
-          <p className="npx-eyebrow">Cross-linguistic noun phrase database</p>
+          <p className="npx-eyebrow">Cross-linguistic noun phrase archive</p>
           <h1 className="npx-h1">How do languages build the phrase that names a thing?</h1>
           <p className="npx-lede">This archive collects noun phrases from natural speech and text across many languages, annotated word by word — so a determiner, a classifier, or a case marker in one language can be set beside its counterpart in another.</p>
           <button className="npx-btn npx-btn-primary" onClick={() => go("explore")}>Browse the collection →</button>
         </div>
         <div className="npx-hero-example">
-          <div className="npx-card-label">A record from the archive</div>
+          <div className="npx-hero-card-header">
+            <div className="npx-card-label">A record from the archive</div>
+            <div className="npx-hero-dots">
+              {poolRef.current.slice(0, 8).map((_, i) => (
+                <button
+                  key={i}
+                  className={"npx-hero-dot" + (i === heroIdx % Math.min(poolRef.current.length, 8) ? " is-active" : "")}
+                  onClick={() => { clearInterval(timerRef.current); setHeroFade(false); setTimeout(() => { setHeroIdx(i); setHeroFade(true); }, 300); }}
+                  aria-label={`Go to example ${i + 1}`}
+                />
+              ))}
+            </div>
+          </div>
           {hero ? (
-            <>
+            <div className={"npx-hero-fade" + (heroFade ? " is-visible" : "")}>
               <IGT tokens={hero.tokens} translation={hero.phrase.phrase_translation} size="lg" />
               <div className="npx-hero-example-meta">
                 {heroLang && <Tag tone="indigo">{heroLang.language_name}</Tag>}
                 {hero.phrase.tag_sequence && <Tag tone="amber">{hero.phrase.tag_sequence}</Tag>}
               </div>
-            </>
+              <button
+                className="npx-btn npx-btn-ghost npx-btn-small npx-hero-view-btn"
+                onClick={() => go("detail", hero.phrase.phrase_id)}
+              >
+                View this record →
+              </button>
+            </div>
           ) : (
             <div className="npx-hero-example-loading"><Dots /> fetching a record…</div>
           )}
@@ -177,7 +243,7 @@ function Home({ go, languageById }) {
       <section className="npx-stats">
         {statsErr ? <ErrorBox message={statsErr} onRetry={loadStats} /> : (
           <>
-            {[["languages represented", stats?.languages], ["noun phrases catalogued", stats?.phrases], ["glossed tokens", stats?.tokens]].map(([label, val]) => (
+            {[["languages with data", stats?.languages], ["noun phrases catalogued", stats?.phrases], ["glossed tokens", stats?.tokens]].map(([label, val]) => (
               <div className="npx-stat" key={label}>
                 <div className="npx-stat-num">{val != null ? val : <Dots />}</div>
                 <div className="npx-stat-label">{label}</div>
@@ -1240,9 +1306,9 @@ function Statistics({ languages, languageById }) {
 
         <p className="npx-filter-hint" style={{ marginBottom: 20 }}>
           Each cell shows how many times the <em>row</em> {seqLevel} precedes the <em>column</em> {seqLevel} anywhere within a phrase — not just in adjacent positions.
-          For a phrase A › B › C, this counts the binary variables of A→B, A→C, and B→C.
+          For a phrase A › B › C, this counts A→B, A→C, and B→C.
           {seqFilterCat && <> Filtered to <strong>{seqFilterCat}</strong>{seqFilterSubcat ? <> › <strong>{seqFilterSubcat}</strong></> : ""} annotations only.</>}
-          {" "}
+          {" "}Repeated labels (e.g. two Nouns) are counted as separate occurrences.
         </p>
 
         {allSeqLabels.length === 0 && (
@@ -1592,7 +1658,16 @@ function Style() {
       .npx-h1 { font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1.15; margin: 0 0 20px; max-width: 20ch; }
       .npx-lede { font-size: 16px; color: var(--ink-soft); max-width: 46ch; margin: 0 0 28px; }
       .npx-lede-sm { font-size: 15px; color: var(--ink-soft); margin: 4px 0 0; }
-      .npx-hero-example { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 6px; padding: 24px; align-self: start; }
+      .npx-hero-example { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 6px; padding: 24px; align-self: start; min-height: 220px; }
+      .npx-hero-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+      .npx-hero-card-header .npx-card-label { margin-bottom: 0; }
+      .npx-hero-dots { display: flex; gap: 5px; align-items: center; }
+      .npx-hero-dot { width: 7px; height: 7px; border-radius: 50%; border: none; cursor: pointer; background: var(--rule); padding: 0; transition: background 0.2s; }
+      .npx-hero-dot.is-active { background: var(--indigo); }
+      .npx-hero-dot:hover { background: var(--indigo-light); }
+      .npx-hero-fade { opacity: 0; transition: opacity 0.3s ease; }
+      .npx-hero-fade.is-visible { opacity: 1; }
+      .npx-hero-view-btn { margin-top: 16px; font-size: 13px; padding: 7px 14px; }
       .npx-card-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-bottom: 14px; }
       .npx-hero-example-meta { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
       .npx-hero-example-loading { color: var(--ink-soft); font-size: 14px; padding: 20px 0; }
