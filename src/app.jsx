@@ -191,7 +191,7 @@ function Home({ go, languageById }) {
 
   // Auto-rotate every 3 seconds
   useEffect(() => {
-    timerRef.current = setInterval(advance, 3000);
+    timerRef.current = setInterval(advance, 5000);
     return () => clearInterval(timerRef.current);
   }, [advance]);
 
