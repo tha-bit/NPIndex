@@ -191,7 +191,7 @@ function Home({ go, languageById }) {
 
   // Auto-rotate every 3 seconds
   useEffect(() => {
-    timerRef.current = setInterval(advance, 5000);
+    timerRef.current = setInterval(advance, 3000);
     return () => clearInterval(timerRef.current);
   }, [advance]);
 
@@ -222,17 +222,27 @@ function Home({ go, languageById }) {
           </div>
           {hero ? (
             <div className={"npx-hero-fade" + (heroFade ? " is-visible" : "")}>
-              <IGT tokens={hero.tokens} translation={hero.phrase.phrase_translation} size="lg" />
-              <div className="npx-hero-example-meta">
-                {heroLang && <Tag tone="indigo">{heroLang.language_name}</Tag>}
-                {hero.phrase.tag_sequence && <Tag tone="amber">{hero.phrase.tag_sequence}</Tag>}
+              <div className="npx-hero-igt-wrap">
+                <IGT tokens={hero.tokens} translation={hero.phrase.phrase_translation} size="lg" />
               </div>
-              <button
-                className="npx-btn npx-btn-ghost npx-btn-small npx-hero-view-btn"
-                onClick={() => go("detail", hero.phrase.phrase_id)}
-              >
-                View this record →
-              </button>
+              <div className="npx-hero-meta-footer">
+                {heroLang && (
+                  <div className="npx-hero-meta-lang">
+                    <Tag tone="indigo">{heroLang.language_name}</Tag>
+                  </div>
+                )}
+                {hero.phrase.tag_sequence && (
+                  <span className="npx-hero-meta-seq" title={hero.phrase.tag_sequence}>
+                    {hero.phrase.tag_sequence}
+                  </span>
+                )}
+                <button
+                  className="npx-btn npx-btn-ghost npx-btn-small npx-hero-view-btn"
+                  onClick={() => go("detail", hero.phrase.phrase_id)}
+                >
+                  View this record →
+                </button>
+              </div>
             </div>
           ) : (
             <div className="npx-hero-example-loading"><Dots /> fetching a record…</div>
@@ -1658,18 +1668,21 @@ function Style() {
       .npx-h1 { font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1.15; margin: 0 0 20px; max-width: 20ch; }
       .npx-lede { font-size: 16px; color: var(--ink-soft); max-width: 46ch; margin: 0 0 28px; }
       .npx-lede-sm { font-size: 15px; color: var(--ink-soft); margin: 4px 0 0; }
-      .npx-hero-example { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 6px; padding: 24px; align-self: start; min-height: 220px; }
-      .npx-hero-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+      .npx-hero-example { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 6px; padding: 24px; align-self: start; height: 320px; display: flex; flex-direction: column; }
+      .npx-hero-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-shrink: 0; }
       .npx-hero-card-header .npx-card-label { margin-bottom: 0; }
       .npx-hero-dots { display: flex; gap: 5px; align-items: center; }
       .npx-hero-dot { width: 7px; height: 7px; border-radius: 50%; border: none; cursor: pointer; background: var(--rule); padding: 0; transition: background 0.2s; }
       .npx-hero-dot.is-active { background: var(--indigo); }
       .npx-hero-dot:hover { background: var(--indigo-light); }
-      .npx-hero-fade { opacity: 0; transition: opacity 0.3s ease; }
+      .npx-hero-fade { opacity: 0; transition: opacity 0.3s ease; flex: 1; display: flex; flex-direction: column; min-height: 0; }
       .npx-hero-fade.is-visible { opacity: 1; }
-      .npx-hero-view-btn { margin-top: 16px; font-size: 13px; padding: 7px 14px; }
+      .npx-hero-igt-wrap { flex: 1; overflow: hidden; }
+      .npx-hero-meta-footer { flex-shrink: 0; margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
+      .npx-hero-meta-lang { display: flex; align-items: center; }
+      .npx-hero-meta-seq { font-family: var(--font-mono); font-size: 11px; color: var(--amber); background: var(--amber-bg); padding: 3px 9px; border-radius: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block; }
+      .npx-hero-view-btn { margin-top: 8px; font-size: 13px; padding: 7px 14px; flex-shrink: 0; align-self: flex-start; }
       .npx-card-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-bottom: 14px; }
-      .npx-hero-example-meta { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
       .npx-hero-example-loading { color: var(--ink-soft); font-size: 14px; padding: 20px 0; }
 
       /* IGT */
