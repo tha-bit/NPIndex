@@ -191,7 +191,7 @@ function Home({ go, languageById }) {
 
   // Auto-rotate every 3 seconds
   useEffect(() => {
-    timerRef.current = setInterval(advance, 5000);
+    timerRef.current = setInterval(advance, 3000);
     return () => clearInterval(timerRef.current);
   }, [advance]);
 
@@ -295,14 +295,14 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
   const { categories, subcategoriesByCategory, typesByCategory } = annotationMeta;
   const dragIdx = useRef(null);
 
-  const addSlot = () => setSlots((s) => [...s, { category: "", subcategory: "", type: "" }]);
+  const addSlot = () => setSlots((s) => [...s, { category: "", subcategory: "", type: "", word: "" }]);
   const removeSlot = (i) => setSlots((s) => s.filter((_, j) => j !== i));
   const updateSlot = (i, field, val) =>
     setSlots((s) => s.map((slot, j) => {
       if (j !== i) return slot;
       const updated = { ...slot, [field]: val };
       // Reset dependent fields when category changes
-      if (field === "category") { updated.subcategory = ""; updated.type = ""; }
+      if (field === "category") { updated.subcategory = ""; updated.type = ""; updated.word = ""; }
       return updated;
     }));
 
@@ -371,6 +371,18 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
                   <option value="">Any type</option>
                   {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
+                <div className="npx-seq-word-row">
+                  <input
+                    className="npx-input npx-select-sm npx-seq-word-input"
+                    placeholder="word (optional)"
+                    value={slot.word || ""}
+                    onChange={(e) => updateSlot(i, "word", e.target.value)}
+                    title="Filter this slot to annotations whose token matches this word (case-insensitive, partial match)"
+                  />
+                  {slot.word && (
+                    <button className="npx-seq-remove" style={{ fontSize: 13 }} onClick={() => updateSlot(i, "word", "")} title="Clear word">×</button>
+                  )}
+                </div>
               </div>
               <button className="npx-seq-remove" onClick={() => removeSlot(i)} title="Remove slot">×</button>
             </div>
@@ -418,12 +430,32 @@ function Explore({ go, languages, languageById, annotationMeta, initialLangFilte
 
     // Fetch annotations for each slot
     const slotRows = await Promise.all(slots.map(async (slot) => {
+      // Build annotation query for this slot
       let path = "annotations?select=phrase_id,order&limit=5000";
       if (slot.category) path += `&category=eq.${enc(slot.category)}`;
       if (slot.subcategory) path += `&subcategory=eq.${enc(slot.subcategory)}`;
       if (slot.type) path += `&type=eq.${enc(slot.type)}`;
-      const { data } = await sb(path);
-      return data; // [{phrase_id, order}]
+      const { data: annRows } = await sb(path);
+
+      // If no word filter, return annotation rows directly
+      if (!slot.word || !slot.word.trim()) return annRows;
+
+      // Word filter: fetch tokens matching the word pattern and intersect
+      // by (phrase_id, order) — annotations and tokens share the same order
+      // within a phrase via the annotations.token field (denormalized copy)
+      // We use the `token` column on annotations directly (ilike match)
+      let wordPath = "annotations?select=phrase_id,order&limit=5000";
+      if (slot.category) wordPath += `&category=eq.${enc(slot.category)}`;
+      if (slot.subcategory) wordPath += `&subcategory=eq.${enc(slot.subcategory)}`;
+      if (slot.type) wordPath += `&type=eq.${enc(slot.type)}`;
+      wordPath += `&token=ilike.${enc("*" + slot.word.trim() + "*")}`;
+      const { data: wordRows } = await sb(wordPath);
+
+      // Build a set of valid (phrase_id, order) pairs from the word-filtered rows
+      const wordSet = new Set(wordRows.map((r) => r.phrase_id + "|||" + r.order));
+
+      // Return only annotation rows whose (phrase_id, order) pair matches
+      return annRows.filter((r) => wordSet.has(r.phrase_id + "|||" + r.order));
     }));
 
     // Group each slot's rows by phrase_id → sorted list of orders
@@ -465,7 +497,7 @@ function Explore({ go, languages, languageById, annotationMeta, initialLangFilte
     setErr(null);
     try {
       // Resolve sequence query
-      const activeSlots = seqSlots.filter((s) => s.category || s.subcategory || s.type);
+      const activeSlots = seqSlots.filter((s) => s.category || s.subcategory || s.type || s.word?.trim());
       let seqIds = null;
       if (activeSlots.length > 0) {
         seqIds = await resolveSequence(activeSlots);
@@ -529,7 +561,7 @@ function Explore({ go, languages, languageById, annotationMeta, initialLangFilte
     setLoading(true);
     try {
       // Fetch ALL matching rows (no pagination) for export
-      const activeSlots = seqSlots.filter((s) => s.category || s.subcategory || s.type);
+      const activeSlots = seqSlots.filter((s) => s.category || s.subcategory || s.type || s.word?.trim());
       let seqIds = null;
       if (activeSlots.length > 0) {
         seqIds = await resolveSequence(activeSlots);
@@ -1763,6 +1795,10 @@ function Style() {
       .npx-seq-remove { background: none; border: none; cursor: pointer; color: var(--ink-soft); font-size: 18px; line-height: 1; padding: 2px 4px; border-radius: 3px; }
       .npx-seq-remove:hover { color: #9C3B2E; background: #F5E8E6; }
       .npx-seq-add { align-self: flex-start; font-size: 12.5px; padding: 6px 12px; }
+      .npx-seq-word-row { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+      .npx-seq-word-input { font-style: italic; color: var(--moss); border-color: var(--rule); }
+      .npx-seq-word-input::placeholder { color: var(--ink-soft); font-style: italic; }
+      .npx-seq-word-input:not(:placeholder-shown) { border-color: var(--moss); background: #F2F6F2; font-style: normal; }
 
       /* Results area */
       .npx-results { min-width: 0; }
