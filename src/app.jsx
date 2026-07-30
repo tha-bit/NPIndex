@@ -85,6 +85,35 @@ function Tag({ children, tone = "indigo" }) {
   return <span className={`npx-tag npx-tag-${tone}`}>{children}</span>;
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function HighlightPhrase({ text, phrase }) {
+  if (!text) return null;
+  const rawPhrase = String(phrase || "").trim();
+  if (!rawPhrase) return <>{text}</>;
+
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(rawPhrase)}(?![\\p{L}\\p{N}])`, "giu");
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<React.Fragment key={`text-${lastIndex}`}>{text.slice(lastIndex, match.index)}</React.Fragment>);
+    }
+    parts.push(<strong key={`match-${match.index}`}>{match[0]}</strong>);
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (parts.length === 0) return <>{text}</>;
+  if (lastIndex < text.length) {
+    parts.push(<React.Fragment key={`tail-${lastIndex}`}>{text.slice(lastIndex)}</React.Fragment>);
+  }
+  return <>{parts}</>;
+}
+
 /* ============================================================
    HEADER
    ============================================================ */
@@ -876,7 +905,9 @@ function Detail({ phraseId, go, languageById }) {
           {context && (
             <section className="npx-section">
               <h2 className="npx-h3">Context</h2>
-              <blockquote className="npx-context-block">{context}</blockquote>
+              <blockquote className="npx-context-block">
+                <HighlightPhrase text={context} phrase={phrase.phrase_main} />
+              </blockquote>
             </section>
           )}
 
