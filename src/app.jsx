@@ -1010,6 +1010,13 @@ const STAT_COLORS = ["#2F4468", "#4B5D45", "#93591D", "#6B3A6B"];
 const STAT_COLORS_LIGHT = ["#DCE3EE", "#D8E4D6", "#EFE0C4", "#E8D8E8"];
 const MAX_LANGS = 4;
 
+function normalizeAnnotationValue(value) {
+  if (!value) return value;
+  const trimmed = String(value).trim();
+  if (!trimmed) return value;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
 function MiniBar({ value, max, color, colorLight, pct, showPct }) {
   const barPct = max > 0 ? (value / max) * 100 : 0;
   return (
@@ -1033,7 +1040,7 @@ function HeatCell({ value, max, color }) {
   );
 }
 
-function Statistics({ languages, languageById }) {
+function Statistics({ languages, languageById, annotationMeta }) {
   const [selected, setSelected] = useState([]);
   // rawData: { langId: [ {category, subcategory, type, phrase_id, order} ] }
   const [rawData, setRawData] = useState({});
@@ -1084,14 +1091,13 @@ function Statistics({ languages, languageById }) {
       );
       // Normalise case: capitalise first letter, lowercase the rest
       // so "NOUN" and "Noun" and "noun" all merge into "Noun"
-      const norm = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
       const map = {};
       results.forEach(({ langId, anns }) => {
         map[langId] = anns.map((a) => ({
           ...a,
-          category: norm(a.category),
-          subcategory: norm(a.subcategory),
-          type: norm(a.type),
+          category: normalizeAnnotationValue(a.category),
+          subcategory: normalizeAnnotationValue(a.subcategory),
+          type: normalizeAnnotationValue(a.type),
         }));
       });
       setRawData(map);
@@ -1109,17 +1115,35 @@ function Statistics({ languages, languageById }) {
 
   // ── Derived data ─────────────────────────────────────────────
 
-  // All categories across all selected languages
-  const allCats = [...new Set(
+  const metadataCategories = annotationMeta?.categories || [];
+  const metadataSubcatsByCat = annotationMeta?.subcategoriesByCategory || {};
+  const metadataTypesByCat = annotationMeta?.typesByCategory || {};
+  const metadataTypesByCatAndSubcat = annotationMeta?.typesByCategoryAndSubcategory || {};
+
+  const dataCats = [...new Set(
     selected.flatMap((id) => (rawData[id] || []).map((a) => a.category).filter(Boolean))
   )].sort();
 
-  // All subcategories under filterCat
-  const allSubcats = filterCat ? [...new Set(
-    selected.flatMap((id) => (rawData[id] || [])
+  // All categories available for the current selection, using shared metadata as the source of truth.
+  const allCats = [...new Set([...(metadataCategories || []), ...dataCats])].sort();
+
+  // All subcategories under filterCat, combining metadata and observed rows.
+  const allSubcats = filterCat ? [...new Set([
+    ...(metadataSubcatsByCat[filterCat] || []),
+    ...selected.flatMap((id) => (rawData[id] || [])
       .filter((a) => a.category === filterCat)
       .map((a) => a.subcategory).filter(Boolean))
-  )].sort() : [];
+  ])].sort() : [];
+
+  function getAvailableTypes(cat, subcat) {
+    const fromMeta = subcat
+      ? (metadataTypesByCatAndSubcat[cat]?.[subcat] || [])
+      : (metadataTypesByCat[cat] || []);
+    const fromRows = selected.flatMap((id) => (rawData[id] || [])
+      .filter((a) => (!cat || a.category === cat) && (!subcat || a.subcategory === subcat))
+      .map((a) => a.type).filter(Boolean));
+    return [...new Set([...(fromMeta || []), ...fromRows])].sort();
+  }
 
   // Build counts for the active tab
   function getCatCounts(langId) {
@@ -1294,28 +1318,41 @@ function Statistics({ languages, languageById }) {
 
   function renderSequenceTab() {
     // Collect all labels across selected languages for current level+filters
-    const allSeqLabels = [...new Set(
-      selected.flatMap((id) => {
-        const rows = (rawData[id] || []).filter((a) => {
-          if (seqFilterCat && a.category !== seqFilterCat) return false;
-          if (seqFilterSubcat && a.subcategory !== seqFilterSubcat) return false;
-          return true;
-        });
-        if (seqLevel === "category") return rows.map((a) => a.category).filter(Boolean);
-        if (seqLevel === "subcategory") return rows.map((a) => a.subcategory).filter(Boolean);
-        return rows.map((a) => a.type).filter(Boolean);
-      })
-    )].sort();
+    function getSeqLabelValue(a) {
+      if (seqLevel === "category") return a.category;
+      if (seqLevel === "subcategory") return a.subcategory;
+      return a.type;
+    }
 
-    // Derive available cats/subcats for the filter dropdowns from rawData
-    const seqAllCats = [...new Set(
-      selected.flatMap((id) => (rawData[id] || []).map((a) => a.category).filter(Boolean))
-    )].sort();
-    const seqAllSubcats = seqFilterCat ? [...new Set(
-      selected.flatMap((id) => (rawData[id] || [])
+    const rowsFromSelection = selected.flatMap((id) => (rawData[id] || []).filter((a) => {
+      if (seqFilterCat && a.category !== seqFilterCat) return false;
+      if (seqFilterSubcat && a.subcategory !== seqFilterSubcat) return false;
+      return true;
+    }));
+
+    const metadataLabels = (() => {
+      if (seqLevel === "category") return metadataCategories;
+      if (seqLevel === "subcategory") return seqFilterCat ? (metadataSubcatsByCat[seqFilterCat] || []) : [];
+      return seqFilterCat
+        ? (seqFilterSubcat
+          ? (metadataTypesByCatAndSubcat[seqFilterCat]?.[seqFilterSubcat] || [])
+          : (metadataTypesByCat[seqFilterCat] || []))
+        : [];
+    })();
+
+    const allSeqLabels = [...new Set([
+      ...metadataLabels,
+      ...rowsFromSelection.map((a) => getSeqLabelValue(a)).filter(Boolean)
+    ])].sort();
+
+    // Derive available cats/subcats for the filter dropdowns from shared metadata and observed rows
+    const seqAllCats = [...new Set([...(metadataCategories || []), ...selected.flatMap((id) => (rawData[id] || []).map((a) => a.category).filter(Boolean))])].sort();
+    const seqAllSubcats = seqFilterCat ? [...new Set([
+      ...(metadataSubcatsByCat[seqFilterCat] || []),
+      ...selected.flatMap((id) => (rawData[id] || [])
         .filter((a) => a.category === seqFilterCat)
         .map((a) => a.subcategory).filter(Boolean))
-    )].sort() : [];
+    ])].sort() : [];
 
     return (
       <div>
@@ -1529,9 +1566,7 @@ function Statistics({ languages, languageById }) {
               })()}
 
               {!loading && !err && tab === "types" && (() => {
-                const keys = [...new Set(
-                  selected.flatMap((id) => Object.keys(getTypeCounts(id, filterCat, filterSubcat)))
-                )].sort();
+                const keys = getAvailableTypes(filterCat, filterSubcat);
                 return (
                   <>
                     <div className="npx-seq-controls">
@@ -1613,20 +1648,23 @@ export default function App() {
       const typeMap = {};
       const typeBySubcatMap = {};
       anns.forEach(({ category, subcategory, type }) => {
-        if (!category) return;
-        catSet.add(category);
-        if (subcategory) {
-          if (!subcatMap[category]) subcatMap[category] = new Set();
-          subcatMap[category].add(subcategory);
+        const cat = normalizeAnnotationValue(category);
+        const subcat = normalizeAnnotationValue(subcategory);
+        const typ = normalizeAnnotationValue(type);
+        if (!cat) return;
+        catSet.add(cat);
+        if (subcat) {
+          if (!subcatMap[cat]) subcatMap[cat] = new Set();
+          subcatMap[cat].add(subcat);
         }
-        if (type) {
-          if (!typeMap[category]) typeMap[category] = new Set();
-          typeMap[category].add(type);
+        if (typ) {
+          if (!typeMap[cat]) typeMap[cat] = new Set();
+          typeMap[cat].add(typ);
         }
-        if (category && subcategory && type) {
-          if (!typeBySubcatMap[category]) typeBySubcatMap[category] = {};
-          if (!typeBySubcatMap[category][subcategory]) typeBySubcatMap[category][subcategory] = new Set();
-          typeBySubcatMap[category][subcategory].add(type);
+        if (cat && subcat && typ) {
+          if (!typeBySubcatMap[cat]) typeBySubcatMap[cat] = {};
+          if (!typeBySubcatMap[cat][subcat]) typeBySubcatMap[cat][subcat] = new Set();
+          typeBySubcatMap[cat][subcat].add(typ);
         }
       });
       setAnnotationMeta({
@@ -1661,7 +1699,7 @@ export default function App() {
         <Explore go={go} languages={languages} languageById={languageById} annotationMeta={annotationMeta} initialLangFilter={initialLangFilter} />
       )}
       {view === "statistics" && (
-        <Statistics languages={languages} languageById={languageById} />
+        <Statistics languages={languages} languageById={languageById} annotationMeta={annotationMeta} />
       )}
       {view === "detail" && selectedPhraseId && (
         <Detail phraseId={selectedPhraseId} go={go} languageById={languageById} />
