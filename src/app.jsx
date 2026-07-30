@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 
 /* ============================================================
    CONFIG
@@ -39,6 +40,33 @@ async function sb(path, { range, count } = {}) {
 
 const enc = (v) => encodeURIComponent(v);
 
+function buildSearchFilter(value) {
+  const query = String(value || "").trim();
+  if (!query) return null;
+
+  if (query.length >= 2 && query.startsWith('"') && query.endsWith('"')) {
+    const phrase = query.slice(1, -1).trim();
+    if (phrase && !phrase.includes('"')) {
+      const escaped = escapeRegExp(phrase);
+      const pattern = `^${escaped}$|^${escaped}[^[:alnum:]_-]|[^[:alnum:]_-]${escaped}$|[^[:alnum:]_-]${escaped}[^[:alnum:]_-]`;
+      return { operator: "imatch", value: enc(pattern) };
+    }
+  }
+
+  if (query.endsWith("*") && !query.startsWith("*")) {
+    const prefix = query.slice(0, -1).trim();
+    if (prefix && !prefix.includes("*")) return { operator: "ilike", value: enc(prefix + "*") };
+  }
+  if (query.startsWith("*") && query.endsWith("*") && query.length > 2) {
+    const contains = query.slice(1, -1).trim();
+    if (contains && !contains.includes("*")) {
+      return { operator: "ilike", value: enc("*" + contains + "*") };
+    }
+  }
+
+  return { operator: "ilike", value: enc("*" + query + "*") };
+}
+
 /* ============================================================
    PRIMITIVES
    ============================================================ */
@@ -57,6 +85,89 @@ function ErrorBox({ message, onRetry }) {
       <div className="npx-error-body">{message}</div>
       {onRetry && <button className="npx-btn npx-btn-ghost" onClick={onRetry}>Try again</button>}
     </div>
+  );
+}
+
+function SearchTips() {
+  const [open, setOpen] = useState(false);
+  const [popoverStyle, setPopoverStyle] = useState({});
+  const ref = useRef(null);
+  const popoverRef = useRef(null);
+  const closeTimer = useRef(null);
+
+  const updatePopoverPosition = useCallback(() => {
+    const button = ref.current?.querySelector(".npx-search-tips-button");
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    const width = Math.min(250, window.innerWidth - 48);
+    const left = Math.min(rect.left, window.innerWidth - width - 24);
+    setPopoverStyle({ top: rect.bottom + 8, left, width });
+  }, []);
+
+  const cancelClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
+  };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    updatePopoverPosition();
+    const close = (event) => {
+      if (!ref.current?.contains(event.target) && !popoverRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    window.addEventListener("resize", updatePopoverPosition);
+    window.addEventListener("scroll", updatePopoverPosition, true);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", updatePopoverPosition);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
+    };
+  }, [open, updatePopoverPosition]);
+
+  useEffect(() => () => cancelClose(), []);
+
+  return (
+    <span
+      className="npx-search-tips"
+      ref={ref}
+      onMouseEnter={() => { cancelClose(); setOpen(true); }}
+      onMouseLeave={scheduleClose}
+    >
+      <button
+        type="button"
+        className="npx-search-tips-button"
+        aria-label="Show search operator tips"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        onFocus={() => setOpen(true)}
+        onBlur={(event) => {
+          if (!ref.current?.contains(event.relatedTarget) && !popoverRef.current?.contains(event.relatedTarget)) scheduleClose();
+        }}
+      >
+        ?
+      </button>
+      {open && createPortal(
+        <div
+          ref={popoverRef}
+          className="npx-search-tips-popover"
+          role="tooltip"
+          style={popoverStyle}
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+        >
+          <strong>Search tips:</strong>
+          <div>1. <code>word</code> for similar match (e.g., old → old, gold, mold, fold)</div>          
+          <div>2. <code>"word"</code> for exact match (e.g., "cat" → cat)</div>
+          <div>3. <code>word*</code> for words starting with "word" (e.g. old* → old, older, oldest)</div>
+          <div>4. <code>*word*</code> for words containing "word" (e.g., *cat* → cat, concatenate, scat)</div>
+        </div>,
+        document.body
+      )}
+    </span>
   );
 }
 
@@ -323,9 +434,21 @@ function Home({ go, languageById }) {
 function SequenceBuilder({ slots, setSlots, annotationMeta }) {
   const { categories, subcategoriesByCategory, typesByCategory, typesByCategoryAndSubcategory } = annotationMeta;
   const dragIdx = useRef(null);
+  const dragPointerId = useRef(null);
+  const [dragging, setDragging] = useState(false);
 
   const addSlot = () => setSlots((s) => [...s, { category: "", subcategory: "", type: "", word: "" }]);
   const removeSlot = (i) => setSlots((s) => s.filter((_, j) => j !== i));
+  const moveSlot = (from, to) => {
+    if (from === to || from < 0 || to < 0) return;
+    setSlots((s) => {
+      if (from >= s.length || to >= s.length) return s;
+      const arr = [...s];
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      return arr;
+    });
+  };
   const updateSlot = (i, field, val) =>
     setSlots((s) => s.map((slot, j) => {
       if (j !== i) return slot;
@@ -340,19 +463,44 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
       return updated;
     }));
 
-  const onDragStart = (i) => { dragIdx.current = i; };
-  const onDragOver = (e, i) => {
-    e.preventDefault();
-    if (dragIdx.current == null || dragIdx.current === i) return;
-    setSlots((s) => {
-      const arr = [...s];
-      const [moved] = arr.splice(dragIdx.current, 1);
-      arr.splice(i, 0, moved);
-      dragIdx.current = i;
-      return arr;
-    });
+  const onPointerDown = (event, i) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    dragIdx.current = i;
+    dragPointerId.current = event.pointerId;
+    setDragging(true);
   };
-  const onDragEnd = () => { dragIdx.current = null; };
+
+  useEffect(() => {
+    if (!dragging) return undefined;
+
+    const onPointerMove = (event) => {
+      if (event.pointerId !== dragPointerId.current || dragIdx.current == null) return;
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-seq-slot-index]");
+      if (!target) return;
+      const targetIdx = Number(target.dataset.seqSlotIndex);
+      if (targetIdx === dragIdx.current || Number.isNaN(targetIdx)) return;
+
+      moveSlot(dragIdx.current, targetIdx);
+      dragIdx.current = targetIdx;
+    };
+
+    const finishDrag = (event) => {
+      if (event.pointerId !== dragPointerId.current) return;
+      dragIdx.current = null;
+      dragPointerId.current = null;
+      setDragging(false);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", finishDrag);
+    window.addEventListener("pointercancel", finishDrag);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", finishDrag);
+      window.removeEventListener("pointercancel", finishDrag);
+    };
+  }, [dragging, setSlots]);
 
   return (
     <div className="npx-seqbuilder">
@@ -372,14 +520,33 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
           return (
             <div
               key={i}
-              className="npx-seq-slot"
-              draggable
-              onDragStart={() => onDragStart(i)}
-              onDragOver={(e) => onDragOver(e, i)}
-              onDragEnd={onDragEnd}
+              className={`npx-seq-slot${dragging && dragIdx.current === i ? " is-dragging" : ""}`}
+              data-seq-slot-index={i}
             >
-              <div className="npx-seq-slot-handle" title="Drag to reorder">⠿</div>
+              <div
+                className="npx-seq-slot-handle"
+                title="Drag to reorder"
+                onPointerDown={(e) => onPointerDown(e, i)}
+              >⠿</div>
               <div className="npx-seq-slot-num">{i + 1}</div>
+              <div className="npx-seq-slot-arrows" aria-label={`Reorder slot ${i + 1}`}>
+                <button
+                  type="button"
+                  className="npx-seq-arrow"
+                  onClick={() => moveSlot(i, i - 1)}
+                  disabled={i === 0}
+                  aria-label="Move slot up"
+                  title="Move up"
+                >↑</button>
+                <button
+                  type="button"
+                  className="npx-seq-arrow"
+                  onClick={() => moveSlot(i, i + 1)}
+                  disabled={i === slots.length - 1}
+                  aria-label="Move slot down"
+                  title="Move down"
+                >↓</button>
+              </div>
               <div className="npx-seq-slot-fields">
                 <select
                   className="npx-select npx-select-sm"
@@ -415,6 +582,7 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
                     onChange={(e) => updateSlot(i, "word", e.target.value)}
                     title="Filter this slot to annotations whose token matches this word (case-insensitive, partial match)"
                   />
+                  <SearchTips />
                   {slot.word && (
                     <button className="npx-seq-remove" style={{ fontSize: 13 }} onClick={() => updateSlot(i, "word", "")} title="Clear word">×</button>
                   )}
@@ -476,15 +644,16 @@ function Explore({ go, languages, languageById, annotationMeta, initialLangFilte
       // If no word filter, return annotation rows directly
       if (!slot.word || !slot.word.trim()) return annRows;
 
-      // Word filter: fetch tokens matching the word pattern and intersect
+      // Word filter: fetch annotations matching the shared search pattern and intersect
       // by (phrase_id, order) — annotations and tokens share the same order
       // within a phrase via the annotations.token field (denormalized copy)
-      // We use the `token` column on annotations directly (ilike match)
+      // We use the `token` column on annotations directly.
       let wordPath = "annotations?select=phrase_id,order&limit=5000";
       if (slot.category) wordPath += `&category=eq.${enc(slot.category)}`;
       if (slot.subcategory) wordPath += `&subcategory=eq.${enc(slot.subcategory)}`;
       if (slot.type) wordPath += `&type=eq.${enc(slot.type)}`;
-      wordPath += `&token=ilike.${enc("*" + slot.word.trim() + "*")}`;
+      const { operator, value } = buildSearchFilter(slot.word);
+      wordPath += `&token=${operator}.${value}`;
       const { data: wordRows } = await sb(wordPath);
 
       // Build a set of valid (phrase_id, order) pairs from the word-filtered rows
@@ -552,8 +721,8 @@ function Explore({ go, languages, languageById, annotationMeta, initialLangFilte
         filters.push(`language_id=in.(${ids})`);
       }
       if (search.trim()) {
-        const term = enc(`*${search.trim()}*`);
-        filters.push(`or=(phrase_main.ilike.${term},phrase_translation.ilike.${term})`);
+        const { operator, value } = buildSearchFilter(search);
+        filters.push(`or=(phrase_main.${operator}.${value},phrase_translation.${operator}.${value})`);
       }
       if (seqIds) {
         filters.push(`phrase_id=in.(${seqIds.map((id) => `"${id}"`).join(",")})`);
@@ -607,8 +776,8 @@ function Explore({ go, languages, languageById, annotationMeta, initialLangFilte
       const filters = [];
       if (langFilters.size > 0) filters.push("language_id=in.(" + [...langFilters].join(",") + ")");
       if (search.trim()) {
-        const term = enc("*" + search.trim() + "*");
-        filters.push("or=(phrase_main.ilike." + term + ",phrase_translation.ilike." + term + ")");
+        const { operator, value } = buildSearchFilter(search);
+        filters.push("or=(phrase_main." + operator + "." + value + ",phrase_translation." + operator + "." + value + ")");
       }
       if (seqIds) filters.push("phrase_id=in.(" + seqIds.map((id) => '"' + id + '"').join(",") + ")");
       if (filters.length) path += "&" + filters.join("&");
@@ -663,7 +832,9 @@ function Explore({ go, languages, languageById, annotationMeta, initialLangFilte
 
           {/* Search */}
           <form onSubmit={submitSearch} className="npx-filter-group">
-            <label className="npx-filter-label" htmlFor="npx-search">Search wording</label>
+            <label className="npx-filter-label" htmlFor="npx-search">
+              Search wording <SearchTips />
+            </label>
             <div className="npx-search-row">
               <input id="npx-search" className="npx-input" placeholder="e.g. the house…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
               <button type="submit" className="npx-btn npx-btn-small">Go</button>
@@ -1858,6 +2029,12 @@ function Style() {
       .npx-filter-badge { background: var(--indigo); color: white; border-radius: 10px; font-size: 10px; padding: 1px 6px; }
       .npx-filter-hint { font-size: 12px; color: var(--ink-soft); margin: 2px 0 0; }
       .npx-search-row { display: flex; gap: 6px; }
+      .npx-search-tips { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; }
+      .npx-search-tips-button { width: 16px; height: 16px; padding: 0; border: 1px solid var(--ink-soft); border-radius: 50%; background: transparent; color: var(--ink-soft); cursor: help; font-family: var(--font-mono); font-size: 10px; line-height: 14px; text-align: center; }
+      .npx-search-tips-button:hover, .npx-search-tips-button:focus-visible { color: var(--ink); border-color: var(--ink); outline: 2px solid var(--indigo); outline-offset: 2px; }
+      .npx-search-tips-popover { position: fixed; z-index: 1000; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px; background: #F8F6EF; opacity: 1; box-shadow: 0 5px 16px rgba(27, 36, 48, 0.14); color: #1B2430; font-family: var(--font-body); font-size: 12px; font-weight: 400; line-height: 1.6; white-space: normal; }
+      .npx-search-tips-popover strong { display: block; margin-bottom: 2px; font-weight: 600; }
+      .npx-search-tips-popover code { font-family: var(--font-mono); color: var(--indigo); }
       .npx-input, .npx-select { border: 1px solid var(--rule); background: var(--paper-raised); border-radius: 4px; padding: 8px 10px; font-size: 14px; width: 100%; }
       .npx-select-sm { font-size: 12.5px; padding: 6px 8px; }
       .npx-input:focus, .npx-select:focus { outline: 2px solid var(--indigo); outline-offset: 2px; }
@@ -1875,10 +2052,15 @@ function Style() {
       .npx-seqbuilder { display: flex; flex-direction: column; gap: 8px; }
       .npx-seq-empty { font-size: 12.5px; color: var(--ink-soft); font-style: italic; padding: 8px 0; }
       .npx-seq-slots { display: flex; flex-direction: column; gap: 6px; }
-      .npx-seq-slot { display: flex; align-items: flex-start; gap: 6px; background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 5px; padding: 8px; cursor: grab; }
-      .npx-seq-slot:active { cursor: grabbing; }
-      .npx-seq-slot-handle { color: var(--ink-soft); font-size: 14px; padding-top: 4px; user-select: none; }
+      .npx-seq-slot { display: flex; align-items: flex-start; gap: 6px; background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 5px; padding: 8px; }
+      .npx-seq-slot.is-dragging { border-color: var(--indigo-light); box-shadow: 0 3px 10px rgba(47, 68, 104, 0.16); }
+      .npx-seq-slot-handle { color: var(--ink-soft); font-size: 14px; padding-top: 4px; user-select: none; cursor: grab; touch-action: none; }
+      .npx-seq-slot-handle:active { cursor: grabbing; }
       .npx-seq-slot-num { font-family: var(--font-mono); font-size: 11px; color: var(--indigo); background: var(--indigo-bg); border-radius: 3px; padding: 2px 6px; margin-top: 4px; white-space: nowrap; }
+      .npx-seq-slot-arrows { display: flex; flex-direction: column; gap: 2px; margin-top: 1px; }
+      .npx-seq-arrow { width: 20px; height: 17px; padding: 0; border: 1px solid var(--rule); border-radius: 3px; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 13px; line-height: 14px; }
+      .npx-seq-arrow:hover:not(:disabled) { background: var(--paper-dark); color: var(--ink); }
+      .npx-seq-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
       .npx-seq-slot-fields { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
       .npx-seq-remove { background: none; border: none; cursor: pointer; color: var(--ink-soft); font-size: 18px; line-height: 1; padding: 2px 4px; border-radius: 3px; }
       .npx-seq-remove:hover { color: #9C3B2E; background: #F5E8E6; }
