@@ -292,7 +292,7 @@ function Home({ go, languageById }) {
    annotations contain a matching subsequence in order.
    ============================================================ */
 function SequenceBuilder({ slots, setSlots, annotationMeta }) {
-  const { categories, subcategoriesByCategory, typesByCategory } = annotationMeta;
+  const { categories, subcategoriesByCategory, typesByCategory, typesByCategoryAndSubcategory } = annotationMeta;
   const dragIdx = useRef(null);
 
   const addSlot = () => setSlots((s) => [...s, { category: "", subcategory: "", type: "", word: "" }]);
@@ -301,8 +301,13 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
     setSlots((s) => s.map((slot, j) => {
       if (j !== i) return slot;
       const updated = { ...slot, [field]: val };
-      // Reset dependent fields when category changes
-      if (field === "category") { updated.subcategory = ""; updated.type = ""; updated.word = ""; }
+      if (field === "category") {
+        updated.subcategory = "";
+        updated.type = "";
+        updated.word = "";
+      } else if (field === "subcategory") {
+        updated.type = "";
+      }
       return updated;
     }));
 
@@ -332,7 +337,9 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
       <div className="npx-seq-slots">
         {slots.map((slot, i) => {
           const subcatOptions = (subcategoriesByCategory[slot.category] || []);
-          const typeOptions = (typesByCategory[slot.category] || []);
+          const typeOptions = slot.subcategory
+            ? (typesByCategoryAndSubcategory[slot.category]?.[slot.subcategory] || [])
+            : (typesByCategory[slot.category] || []);
           return (
             <div
               key={i}
@@ -1580,7 +1587,7 @@ export default function App() {
 
   const [languages, setLanguages] = useState([]);
   const [languageById, setLanguageById] = useState({});
-  const [annotationMeta, setAnnotationMeta] = useState({ categories: [], subcategoriesByCategory: {}, typesByCategory: {} });
+  const [annotationMeta, setAnnotationMeta] = useState({ categories: [], subcategoriesByCategory: {}, typesByCategory: {}, typesByCategoryAndSubcategory: {} });
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -1604,6 +1611,7 @@ export default function App() {
       const catSet = new Set();
       const subcatMap = {};
       const typeMap = {};
+      const typeBySubcatMap = {};
       anns.forEach(({ category, subcategory, type }) => {
         if (!category) return;
         catSet.add(category);
@@ -1615,11 +1623,22 @@ export default function App() {
           if (!typeMap[category]) typeMap[category] = new Set();
           typeMap[category].add(type);
         }
+        if (category && subcategory && type) {
+          if (!typeBySubcatMap[category]) typeBySubcatMap[category] = {};
+          if (!typeBySubcatMap[category][subcategory]) typeBySubcatMap[category][subcategory] = new Set();
+          typeBySubcatMap[category][subcategory].add(type);
+        }
       });
       setAnnotationMeta({
         categories: [...catSet].sort(),
         subcategoriesByCategory: Object.fromEntries(Object.entries(subcatMap).map(([k, v]) => [k, [...v].sort()])),
         typesByCategory: Object.fromEntries(Object.entries(typeMap).map(([k, v]) => [k, [...v].sort()])),
+        typesByCategoryAndSubcategory: Object.fromEntries(
+          Object.entries(typeBySubcatMap).map(([category, subcats]) => [
+            category,
+            Object.fromEntries(Object.entries(subcats).map(([subcategory, types]) => [subcategory, [...types].sort()]))
+          ])
+        ),
       });
     }).catch(console.error);
   }, []);
