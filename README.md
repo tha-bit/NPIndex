@@ -39,12 +39,14 @@ Key capabilities:
 ├── vite.config.js      # Vite and React plugin configuration
 ├── src/
 │   ├── main.jsx        # React root and StrictMode bootstrap
-│   ├── app.jsx         # Data access, views, components, interactions, and styles
+│   ├── app.jsx         # Browser routing, shared data loading, and app shell
+│   ├── archive.jsx     # Shared data helpers, view implementations, and styles
+│   ├── pages/          # Route-level About, Languages, Explore, Statistics, and Detail pages
 │   └── index.css       # Global base styles
 └── README.md           # Project and coding-agent guide
 ```
 
-Most application behavior intentionally lives in `src/app.jsx`. The file is organized into data access helpers, reusable primitives, page/view components, and the root `App` component.
+Route definitions and shared application data loading live in `src/app.jsx`. Existing view behavior and reusable UI remain in `src/archive.jsx`, while `src/pages` provides a separate component for each route.
 
 ## 4. Main Features
 
@@ -96,7 +98,7 @@ The main search and filtering workspace.
 
 ## 5. AI Agent Guidance
 
-Before changing behavior, inspect the nearest owning code path in `src/app.jsx` and any related styles in the same file. Avoid scanning or refactoring unrelated views unless the requested behavior crosses a shared boundary.
+Before changing behavior, inspect the nearest owning page in `src/pages`, its view implementation in `src/archive.jsx`, and any related styles in the same file. Avoid scanning or refactoring unrelated views unless the requested behavior crosses a shared boundary.
 
 Important locations:
 
@@ -106,6 +108,7 @@ Important locations:
 - `Explore`: search state, filtering, pagination, export, and sequence resolution.
 - `Detail`, `Languages`, and `Statistics`: their corresponding page-level workflows.
 - `Style`: the application’s component CSS and responsive layout rules.
+- `src/app.jsx`: route definitions, shared metadata loading, and navigation mapping.
 - `src/main.jsx`: application bootstrap only; it should rarely need changes.
 
 Prefer reusing existing helpers, components, state, and CSS conventions. In particular, do not duplicate search parsing or reorder logic. Keep changes focused, preserve the current Supabase schema and public behavior, and avoid broad rewrites of `src/app.jsx` for local feature changes.
