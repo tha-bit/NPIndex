@@ -235,8 +235,8 @@ function Header({ view, go }) {
         <button className="npx-brand" onClick={() => go("home")}>
           <span className="npx-brand-mark">NP</span>
           <span className="npx-brand-text">
-            Noun Phrase Index
-            <span className="npx-brand-sub">a cross-linguistic structure archive</span>
+            Noun Phrase DB
+            <span className="npx-brand-sub">a cross-linguistic archive</span>
           </span>
         </button>
         <nav className="npx-nav">
@@ -342,8 +342,8 @@ function Home({ go, languageById }) {
       <section className="npx-hero">
         <div className="npx-hero-text">
           <p className="npx-eyebrow">Cross-linguistic noun phrase archive</p>
-          <h1 className="npx-h1">How do languages build the phrase that names a thing?</h1>
-          <p className="npx-lede">This archive collects noun phrases from natural speech and text across many languages, annotated word by word — so a determiner, a classifier, or a case marker in one language can be set beside its counterpart in another.</p>
+          <h1 className="npx-h1">Noun phrases across languages</h1>
+          <p className="npx-lede">This database brings together noun phrases from languages around the world, drawn from natural speech and text and annotated word by word. It supports cross-linguistic comparison of the forms and structures that occur within the noun phrase.</p>
           <button className="npx-btn npx-btn-primary" onClick={() => go("explore")}>Browse the collection →</button>
         </div>
         <div className="npx-hero-example">
@@ -393,7 +393,7 @@ function Home({ go, languageById }) {
       <section className="npx-stats">
         {statsErr ? <ErrorBox message={statsErr} onRetry={loadStats} /> : (
           <>
-            {[["languages with data", stats?.languages], ["noun phrases catalogued", stats?.phrases], ["glossed tokens", stats?.tokens]].map(([label, val]) => (
+            {[["languages", stats?.languages], ["noun phrases", stats?.phrases], ["glossed tokens", stats?.tokens]].map(([label, val]) => (
               <div className="npx-stat" key={label}>
                 <div className="npx-stat-num">{val != null ? val : <Dots />}</div>
                 <div className="npx-stat-label">{label}</div>
@@ -405,13 +405,13 @@ function Home({ go, languageById }) {
 
       <section className="npx-about">
         <div className="npx-about-col">
-          <h2 className="npx-h2">What's in a record</h2>
-          <p>Every noun phrase is drawn from a recorded or transcribed <em>session</em> — a piece of speech or text attributed to a <em>source</em> and reviewed by an <em>annotator</em>. Each phrase is broken into <em>tokens</em>, and each token carries its own gloss, so you can read the internal grammar of the phrase, not just its translation.</p>
+          <h2 className="npx-h2">What is in a record</h2>
+          <p>Every noun phrase is drawn from a linguistic <em>corpus</em>, a structured collection of recorded or transcribed language data. Each phrase is linked to source and reviewed by a native-speaking <em>annotator</em>. Each phrase is broken into <em>tokens</em>, and each token carries its own <em>gloss</em> and <em>categorical type</em> so you can read the internal grammar of the phrase with the <em>translation</em>.</p>
         </div>
         <div className="npx-about-col">
           <h2 className="npx-h2">How the data is organized</h2>
           <ul className="npx-tree">
-            <li>language<ul><li>source</li><li>session<ul><li>context (full sentence)</li><li>phrase<ul><li>token → gloss</li><li>annotation (category · subcategory · type)</li></ul></li></ul></li></ul></li>
+            <li>language<ul><li>source</li><li>session<ul><li>context</li><li>phrase<ul><li>token</li><li>annotation (category → subcategory → type)</li></ul></li></ul></li></ul></li>
           </ul>
         </div>
       </section>
@@ -1906,7 +1906,7 @@ export default function App() {
       {view === "detail" && selectedPhraseId && (
         <Detail phraseId={selectedPhraseId} go={go} languageById={languageById} />
       )}
-      <footer className="npx-footer">Data served live from Supabase · Cross-linguistic noun phrase archive</footer>
+      <footer className="npx-footer">Cross-linguistic noun phrase archive · Developed by Taha Yangin</footer>
     </div>
   );
 }
