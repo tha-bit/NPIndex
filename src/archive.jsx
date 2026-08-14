@@ -503,8 +503,13 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
   }, [dragging, setSlots]);
 
   return (
-    <div className="npx-seqbuilder">
-      <div className="npx-filter-label">Sequence query</div>
+    <div className={`npx-seqbuilder${slots.length ? " has-slots" : ""}`}>
+      <div className="npx-seqbuilder-head">
+        <div className="npx-filter-label">Sequence query</div>
+        <button className="npx-btn npx-btn-ghost npx-btn-small npx-seq-add" onClick={addSlot}>
+          + Add slot
+        </button>
+      </div>
       <p className="npx-filter-hint">Build a sequence of annotation slots. Phrases matching this ordered pattern will be returned.</p>
 
       {slots.length === 0 && (
@@ -594,9 +599,6 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
         })}
       </div>
 
-      <button className="npx-btn npx-btn-ghost npx-btn-small npx-seq-add" onClick={addSlot}>
-        + Add slot
-      </button>
     </div>
   );
 }
@@ -621,6 +623,26 @@ export function Explore({ go, languages, languageById, annotationMeta, initialLa
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(false);
   const reqId = useRef(0);
+  const languageDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const closeLanguageDropdown = (event) => {
+      if (!languageDropdownRef.current?.contains(event.target)) {
+        languageDropdownRef.current?.removeAttribute("open");
+      }
+    };
+    const closeLanguageDropdownOnEscape = (event) => {
+      if (event.key !== "Escape" || !languageDropdownRef.current?.open) return;
+      languageDropdownRef.current.removeAttribute("open");
+      languageDropdownRef.current.querySelector("summary")?.focus();
+    };
+    document.addEventListener("mousedown", closeLanguageDropdown);
+    document.addEventListener("keydown", closeLanguageDropdownOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeLanguageDropdown);
+      document.removeEventListener("keydown", closeLanguageDropdownOnEscape);
+    };
+  }, []);
 
   /* --- sequence matching ---
      For each slot, fetch phrase_ids from annotations matching that slot's
@@ -760,6 +782,15 @@ export function Explore({ go, languages, languageById, annotationMeta, initialLa
     });
   };
 
+  const changeSort = (field) => {
+    if (sortField === field) {
+      setSortDir((direction) => direction === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
   const hasFilters = langFilters.size > 0 || search || seqSlots.length > 0;
 
   const exportCSV = useCallback(async () => {
@@ -827,67 +858,60 @@ export function Explore({ go, languages, languageById, annotationMeta, initialLa
       </div>
 
       <div className="npx-explore-layout">
-        {/* SIDEBAR */}
-        <aside className="npx-filters">
+        <section className="npx-filter-bar" aria-label="Explore filters">
+          <div className="npx-filter-row">
+            {/* Search */}
+            <form onSubmit={submitSearch} className="npx-filter-group npx-search-filter">
+              <label className="npx-filter-label" htmlFor="npx-search">
+                Search wording <SearchTips />
+              </label>
+              <div className="npx-search-row">
+                <input id="npx-search" className="npx-input" placeholder="e.g. the house…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+                <button type="submit" className="npx-btn npx-btn-small">Search</button>
+              </div>
+              <p className="npx-filter-hint">Matches phrase text or its translation.</p>
+            </form>
 
-          {/* Search */}
-          <form onSubmit={submitSearch} className="npx-filter-group">
-            <label className="npx-filter-label" htmlFor="npx-search">
-              Search wording <SearchTips />
-            </label>
-            <div className="npx-search-row">
-              <input id="npx-search" className="npx-input" placeholder="e.g. the house…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
-              <button type="submit" className="npx-btn npx-btn-small">Go</button>
+            {/* Language multi-select */}
+            <div className="npx-filter-group npx-language-filter">
+              <div className="npx-filter-label">
+                Language
+                {langFilters.size > 0 && <span className="npx-filter-badge">{langFilters.size}</span>}
+              </div>
+              <details className="npx-language-dropdown" ref={languageDropdownRef}>
+                <summary className="npx-language-dropdown-toggle">
+                  <span>{langFilters.size > 0 ? `${langFilters.size} selected` : "All languages"}</span>
+                  <span className="npx-language-dropdown-arrow" aria-hidden="true">▾</span>
+                </summary>
+                <div className="npx-lang-checks npx-language-dropdown-panel">
+                  {languages.map((l) => (
+                    <label key={l.language_id} className="npx-check-row">
+                      <input
+                        type="checkbox"
+                        className="npx-checkbox"
+                        checked={langFilters.has(String(l.language_id))}
+                        onChange={() => toggleLang(String(l.language_id))}
+                      />
+                      <span className="npx-check-label">{l.language_name}</span>
+                      {l.iso_code && <span className="npx-check-iso">{l.iso_code}</span>}
+                    </label>
+                  ))}
+                </div>
+              </details>
             </div>
-            <p className="npx-filter-hint">Matches phrase text or its translation.</p>
-          </form>
 
-          {/* Language multi-select */}
-          <div className="npx-filter-group">
-            <div className="npx-filter-label">
-              Language
-              {langFilters.size > 0 && <span className="npx-filter-badge">{langFilters.size}</span>}
-            </div>
-            <div className="npx-lang-checks">
-              {languages.map((l) => (
-                <label key={l.language_id} className="npx-check-row">
-                  <input
-                    type="checkbox"
-                    className="npx-checkbox"
-                    checked={langFilters.has(String(l.language_id))}
-                    onChange={() => toggleLang(String(l.language_id))}
-                  />
-                  <span className="npx-check-label">{l.language_name}</span>
-                  {l.iso_code && <span className="npx-check-iso">{l.iso_code}</span>}
-                </label>
-              ))}
-            </div>
+            {hasFilters && (
+              <div className="npx-filter-actions">
+                <button className="npx-btn npx-btn-ghost npx-btn-small npx-clear" onClick={() => {
+                  setLangFilters(new Set()); setSeqSlots([]); setSearch(""); setSearchInput("");
+                }}>Clear all</button>
+              </div>
+            )}
           </div>
 
           {/* Sequence query builder */}
           <SequenceBuilder slots={seqSlots} setSlots={setSeqSlots} annotationMeta={annotationMeta} />
-
-          {/* Sort */}
-          <div className="npx-filter-group">
-            <div className="npx-filter-label">Sort</div>
-            <div className="npx-search-row">
-              <select className="npx-select" value={sortField} onChange={(e) => setSortField(e.target.value)}>
-                <option value="phrase_main">Phrase</option>
-                <option value="language_id">Language</option>
-                <option value="phrase_id">ID</option>
-              </select>
-              <button type="button" className="npx-btn npx-btn-small" onClick={() => setSortDir((d) => d === "asc" ? "desc" : "asc")}>
-                {sortDir === "asc" ? "A–Z" : "Z–A"}
-              </button>
-            </div>
-          </div>
-
-          {hasFilters && (
-            <button className="npx-btn npx-btn-ghost npx-clear" onClick={() => {
-              setLangFilters(new Set()); setSeqSlots([]); setSearch(""); setSearchInput("");
-            }}>Clear all filters</button>
-          )}
-        </aside>
+        </section>
 
         {/* RESULTS */}
         <main className="npx-results">
@@ -926,9 +950,17 @@ export function Explore({ go, languages, languageById, annotationMeta, initialLa
               <table className="npx-results-table">
                 <thead>
                   <tr>
-                    <th>Phrase</th>
+                    <th aria-sort={sortField === "phrase_main" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button className="npx-table-sort" onClick={() => changeSort("phrase_main")}>
+                        Phrase <span aria-hidden="true">{sortField === "phrase_main" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>
+                      </button>
+                    </th>
                     <th>Translation</th>
-                    <th>Language</th>
+                    <th aria-sort={sortField === "language_id" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                      <button className="npx-table-sort" onClick={() => changeSort("language_id")}>
+                        Language <span aria-hidden="true">{sortField === "language_id" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>
+                      </button>
+                    </th>
                     <th>Structure</th>
                     <th>Context</th>
                   </tr>
@@ -1923,14 +1955,17 @@ export function Style() {
       /* Explore layout */
       .npx-explore-header { padding: 40px 0 24px; }
       .npx-h1-sm { font-family: var(--font-display); font-size: 30px; font-weight: 600; margin: 0; }
-      .npx-explore-layout { display: grid; grid-template-columns: 260px 1fr; gap: 40px; align-items: start; }
+      .npx-explore-layout { display: flex; flex-direction: column; gap: 24px; }
 
-      /* Sidebar filters */
-      .npx-filters { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 24px; max-height: calc(100vh - 100px); overflow-y: auto; padding-bottom: 20px; }
-      .npx-filter-group { display: flex; flex-direction: column; gap: 6px; }
+      /* Explore filters */
+      .npx-filter-bar { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 6px; background: rgba(248, 246, 239, 0.55); }
+      .npx-filter-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+      .npx-filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+      .npx-search-filter { flex: 1 1 280px; max-width: 420px; order: 1; }
+      .npx-language-filter { flex: 0 1 190px; width: 190px; margin-left: auto; order: 3; }
       .npx-filter-label { font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
       .npx-filter-badge { background: var(--indigo); color: white; border-radius: 10px; font-size: 10px; padding: 1px 6px; }
-      .npx-filter-hint { font-size: 12px; color: var(--ink-soft); margin: 2px 0 0; }
+      .npx-filter-hint { font-size: 12px; color: var(--ink-soft); margin: 1px 0 0; }
       .npx-search-row { display: flex; gap: 6px; }
       .npx-search-tips { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; }
       .npx-search-tips-button { width: 16px; height: 16px; padding: 0; border: 1px solid var(--ink-soft); border-radius: 50%; background: transparent; color: var(--ink-soft); cursor: help; font-family: var(--font-mono); font-size: 10px; line-height: 14px; text-align: center; }
@@ -1939,12 +1974,24 @@ export function Style() {
       .npx-search-tips-popover strong { display: block; margin-bottom: 2px; font-weight: 600; }
       .npx-search-tips-popover code { font-family: var(--font-mono); color: var(--indigo); }
       .npx-input, .npx-select { border: 1px solid var(--rule); background: var(--paper-raised); border-radius: 4px; padding: 8px 10px; font-size: 14px; width: 100%; }
+      .npx-filter-bar .npx-input, .npx-filter-bar .npx-select { padding: 6px 8px; }
+      .npx-filter-bar .npx-btn-small { padding: 5px 9px; white-space: nowrap; }
+      .npx-filter-bar .npx-filter-row .npx-filter-hint { display: none; }
+      .npx-search-filter .npx-search-row { gap: 6px; }
       .npx-select-sm { font-size: 12.5px; padding: 6px 8px; }
       .npx-input:focus, .npx-select:focus { outline: 2px solid var(--indigo); outline-offset: 2px; }
+      .npx-filter-actions { align-self: flex-end; order: 2; }
       .npx-clear { align-self: flex-start; }
 
       /* Language checkboxes */
       .npx-lang-checks { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; border: 1px solid var(--rule); border-radius: 4px; padding: 8px; background: var(--paper-raised); }
+      .npx-language-dropdown { position: relative; min-width: 0; }
+      .npx-language-dropdown-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 6px 8px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper-raised); color: var(--ink); cursor: pointer; font-size: 13.5px; list-style: none; }
+      .npx-language-dropdown-toggle::-webkit-details-marker { display: none; }
+      .npx-language-dropdown-toggle:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+      .npx-language-dropdown-arrow { color: var(--ink-soft); transition: transform 0.15s ease; }
+      .npx-language-dropdown[open] .npx-language-dropdown-arrow { transform: rotate(180deg); }
+      .npx-language-dropdown-panel { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; width: 220px; max-height: 260px; box-shadow: 0 5px 16px rgba(27, 36, 48, 0.14); }
       .npx-check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 3px 4px; border-radius: 3px; font-size: 13.5px; }
       .npx-check-row:hover { background: var(--paper-dark); }
       .npx-checkbox { width: 14px; height: 14px; cursor: pointer; accent-color: var(--indigo); flex-shrink: 0; }
@@ -1953,9 +2000,16 @@ export function Style() {
 
       /* Sequence builder */
       .npx-seqbuilder { display: flex; flex-direction: column; gap: 8px; }
+      .npx-seqbuilder-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }
+      .npx-filter-bar .npx-seqbuilder { gap: 4px; min-width: 0; border-top: 1px solid var(--rule); padding-top: 8px; }
+      .npx-filter-bar .npx-seqbuilder:not(.has-slots) > .npx-filter-hint,
+      .npx-filter-bar .npx-seqbuilder:not(.has-slots) > .npx-seq-empty { display: none; }
+      .npx-filter-bar .npx-seqbuilder.has-slots > .npx-filter-hint { margin-top: -2px; }
       .npx-seq-empty { font-size: 12.5px; color: var(--ink-soft); font-style: italic; padding: 8px 0; }
       .npx-seq-slots { display: flex; flex-direction: column; gap: 6px; }
+      .npx-filter-bar .npx-seq-slots { flex-direction: column; flex-wrap: nowrap; }
       .npx-seq-slot { display: flex; align-items: flex-start; gap: 6px; background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 5px; padding: 8px; }
+      .npx-filter-bar .npx-seq-slot { flex: none; width: 100%; }
       .npx-seq-slot.is-dragging { border-color: var(--indigo-light); box-shadow: 0 3px 10px rgba(47, 68, 104, 0.16); }
       .npx-seq-slot-handle { color: var(--ink-soft); font-size: 14px; padding-top: 4px; user-select: none; cursor: grab; touch-action: none; }
       .npx-seq-slot-handle:active { cursor: grabbing; }
@@ -1965,6 +2019,7 @@ export function Style() {
       .npx-seq-arrow:hover:not(:disabled) { background: var(--paper-dark); color: var(--ink); }
       .npx-seq-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
       .npx-seq-slot-fields { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+      .npx-filter-bar .npx-seq-slot-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
       .npx-seq-remove { background: none; border: none; cursor: pointer; color: var(--ink-soft); font-size: 18px; line-height: 1; padding: 2px 4px; border-radius: 3px; }
       .npx-seq-remove:hover { color: #9C3B2E; background: #F5E8E6; }
       .npx-seq-add { align-self: flex-start; font-size: 12.5px; padding: 6px 12px; }
@@ -1986,6 +2041,10 @@ export function Style() {
       .npx-table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; }
       .npx-results-table { width: 100%; border-collapse: collapse; font-size: 14px; }
       .npx-results-table th { text-align: left; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); border-bottom: 1px solid var(--rule); padding: 10px 14px; background: var(--paper-raised); white-space: nowrap; }
+      .npx-table-sort { display: inline-flex; align-items: center; gap: 5px; margin: -4px -6px; padding: 4px 6px; border: 0; border-radius: 3px; background: transparent; color: inherit; cursor: pointer; font: inherit; text-transform: inherit; letter-spacing: inherit; }
+      .npx-table-sort:hover { background: var(--paper-dark); color: var(--ink); }
+      .npx-table-sort:focus-visible { outline: 2px solid var(--indigo); outline-offset: 1px; }
+      .npx-table-sort span { color: var(--indigo); font-size: 12px; }
       .npx-results-table td { padding: 11px 14px; border-bottom: 1px solid var(--paper-dark); vertical-align: top; }
       .npx-result-row { cursor: pointer; transition: background 0.1s; }
       .npx-result-row:hover { background: var(--paper-raised); }
@@ -2132,11 +2191,20 @@ export function Style() {
       @media (max-width: 900px) {
         .npx-hero { grid-template-columns: 1fr; padding-top: 40px; }
         .npx-about { grid-template-columns: 1fr; }
-        .npx-explore-layout { grid-template-columns: 1fr; }
-        .npx-filters { position: static; max-height: none; }
+        .npx-filter-bar .npx-seq-slot-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .npx-detail-layout { grid-template-columns: 1fr; }
         .npx-detail-side { border-left: none; padding-left: 0; border-top: 1px solid var(--rule); padding-top: 24px; }
         .npx-h1 { font-size: 30px; }
+      }
+      @media (max-width: 600px) {
+        .npx-filter-bar { padding: 14px; }
+        .npx-filter-row { align-items: stretch; }
+        .npx-search-filter { flex-basis: 100%; max-width: none; }
+        .npx-language-filter { flex: 1 1 100%; width: 100%; margin-left: 0; order: 2; }
+        .npx-filter-actions { align-self: flex-start; order: 3; }
+        .npx-language-dropdown-panel { position: static; width: auto; max-height: 180px; margin-top: 4px; box-shadow: none; }
+        .npx-filter-bar .npx-seq-slot-fields { grid-template-columns: 1fr; }
+        .npx-results-controls { flex-wrap: wrap; }
       }
     `}</style>
   );
