@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { signInWithPassword } from "../archive.jsx";
+import { AdminLogin, AdminPageHeader, adminRequest, useAdminSession } from "../components/AdminAccess.jsx";
 
 
-const API_BASE = String(import.meta.env.VITE_MIGRATION_API_URL || "").replace(/\/$/, "");
-const TOKEN_KEY = "npindex_admin_access_token";
 const TERMINAL_STATUSES = new Set(["completed", "completed_with_errors", "failed"]);
 const FILE_ROLES = [
   { key: "lexicon", label: "Lexicon table" },
@@ -16,32 +14,6 @@ function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function errorMessage(payload, fallback) {
-  const detail = payload?.detail;
-  if (typeof detail === "string") return detail;
-  if (typeof detail?.message === "string") return detail.message;
-  if (typeof payload?.message === "string") return payload.message;
-  return fallback;
-}
-
-async function adminRequest(path, token, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(errorMessage(payload, `Request failed (${response.status}).`));
-    error.status = response.status;
-    error.payload = payload;
-    throw error;
-  }
-  return payload;
 }
 
 function filesFormData(files, metadata = {}) {
@@ -67,55 +39,8 @@ function IssueList({ issues }) {
   );
 }
 
-function AdminLogin({ onAuthenticated }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const submit = async (event) => {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      const session = await signInWithPassword(email.trim(), password);
-      await onAuthenticated(session.access_token);
-    } catch (authError) {
-      setError(authError.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="npx-page npx-admin-page">
-      <div className="npx-admin-login">
-        <p className="npx-eyebrow">Restricted administration</p>
-        <h1 className="npx-h1-sm">Admin sign in</h1>
-        <p className="npx-lede-sm">Use an authorised NPIndex administrator account to access data migration.</p>
-        <form className="npx-admin-login-form" onSubmit={submit}>
-          <label className="npx-filter-group">
-            <span className="npx-filter-label">Email</span>
-            <input className="npx-input" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
-          </label>
-          <label className="npx-filter-group">
-            <span className="npx-filter-label">Password</span>
-            <input className="npx-input" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
-          </label>
-          {error && <div className="npx-admin-message is-error">{error}</div>}
-          <button className="npx-btn npx-btn-primary" type="submit" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 export default function AdminDataMigrationPage() {
-  const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY) || "");
-  const [admin, setAdmin] = useState(null);
-  const [authState, setAuthState] = useState(token ? "checking" : "signed_out");
+  const { token, admin, authState, authenticate, signOut } = useAdminSession();
   const [files, setFiles] = useState({});
   const [sourceName, setSourceName] = useState("");
   const [annotatorName, setAnnotatorName] = useState("");
@@ -123,24 +48,6 @@ export default function AdminDataMigrationPage() {
   const [validating, setValidating] = useState(false);
   const [job, setJob] = useState(null);
   const [error, setError] = useState("");
-
-  const verifyToken = async (candidate) => {
-    const profile = await adminRequest("/api/admin/me", candidate);
-    sessionStorage.setItem(TOKEN_KEY, candidate);
-    setToken(candidate);
-    setAdmin(profile);
-    setAuthState("authenticated");
-  };
-
-  useEffect(() => {
-    if (!token || authState !== "checking") return;
-    verifyToken(token).catch(() => {
-      sessionStorage.removeItem(TOKEN_KEY);
-      setToken("");
-      setAdmin(null);
-      setAuthState("signed_out");
-    });
-  }, [token, authState]);
 
   useEffect(() => {
     if (!job?.id || TERMINAL_STATUSES.has(job.status)) return undefined;
@@ -215,18 +122,11 @@ export default function AdminDataMigrationPage() {
     }
   };
 
-  const signOut = () => {
-    sessionStorage.removeItem(TOKEN_KEY);
-    setToken("");
-    setAdmin(null);
-    setAuthState("signed_out");
-  };
-
   if (authState === "checking") {
     return <div className="npx-page npx-admin-page"><div className="npx-detail-loading">Checking administrator access…</div></div>;
   }
   if (authState !== "authenticated") {
-    return <AdminLogin onAuthenticated={verifyToken} />;
+    return <AdminLogin onAuthenticated={authenticate} description="Use an authorised NPIndex administrator account to access data migration." />;
   }
 
   const isRunning = job && !TERMINAL_STATUSES.has(job.status);
@@ -235,17 +135,13 @@ export default function AdminDataMigrationPage() {
 
   return (
     <div className="npx-page npx-admin-page">
-      <div className="npx-admin-header">
-        <div>
-          <p className="npx-eyebrow">Restricted administration</p>
-          <h1 className="npx-h1-sm">Data migration</h1>
-          <p className="npx-lede-sm">Validate and import a four-file NPIndex CSV bundle.</p>
-        </div>
-        <div className="npx-admin-account">
-          <span>{admin?.email}</span>
-          <button className="npx-btn npx-btn-ghost npx-btn-small" onClick={signOut}>Sign out</button>
-        </div>
-      </div>
+      <AdminPageHeader
+        admin={admin}
+        title="Data migration"
+        description="Validate and import a four-file NPIndex CSV bundle."
+        onSignOut={signOut}
+        backTo="/admin"
+      />
 
       <section className="npx-admin-panel">
         <h2 className="npx-h3">1. Dataset metadata</h2>

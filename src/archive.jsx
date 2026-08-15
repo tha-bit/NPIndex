@@ -2203,6 +2203,15 @@ export function Style() {
       .npx-admin-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
       .npx-admin-header .npx-eyebrow, .npx-admin-login .npx-eyebrow { margin-bottom: 8px; }
       .npx-admin-account { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); font-size: 13px; }
+      .npx-admin-back { display: inline-block; margin-bottom: 12px; color: var(--indigo); font-family: var(--font-mono); font-size: 11px; text-decoration: none; text-transform: uppercase; }
+      .npx-admin-back:hover { text-decoration: underline; }
+      .npx-admin-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+      .npx-admin-tool-card { display: flex; flex-direction: column; min-height: 190px; padding: 22px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper-raised); color: var(--ink); text-decoration: none; transition: border-color 0.15s ease, transform 0.15s ease; }
+      .npx-admin-tool-card:hover { border-color: var(--indigo-light); transform: translateY(-1px); }
+      .npx-admin-tool-card .npx-eyebrow { margin-bottom: 10px; }
+      .npx-admin-tool-card .npx-h3 { margin-bottom: 8px; }
+      .npx-admin-tool-card p { max-width: 600px; margin: 0 0 22px; color: var(--ink-soft); font-size: 13.5px; line-height: 1.55; }
+      .npx-admin-tool-card strong { margin-top: auto; color: var(--indigo); font-size: 13px; }
       .npx-admin-panel { margin-bottom: 18px; padding: 20px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper-raised); }
       .npx-admin-panel > .npx-h3 { margin-bottom: 14px; }
       .npx-admin-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }

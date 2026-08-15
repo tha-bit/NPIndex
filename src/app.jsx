@@ -13,6 +13,7 @@ import DetailPage from "./pages/DetailPage.jsx";
 import ExplorePage from "./pages/ExplorePage.jsx";
 import LanguagesPage from "./pages/LanguagesPage.jsx";
 import StatisticsPage from "./pages/StatisticsPage.jsx";
+import AdminPage from "./pages/AdminPage.jsx";
 import AdminDataMigrationPage from "./pages/AdminDataMigrationPage.jsx";
 
 const EMPTY_ANNOTATION_META = {
@@ -127,6 +128,7 @@ function AppRoutes() {
         <Route path="/explore" element={<ExplorePage {...sharedPageProps} />} />
         <Route path="/explore/:phraseId" element={<DetailPage go={go} languageById={languageById} />} />
         <Route path="/statistics" element={<StatisticsPage {...sharedPageProps} />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/admin/data-migration" element={<AdminDataMigrationPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
