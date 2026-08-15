@@ -506,10 +506,10 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
     <div className={`npx-seqbuilder${slots.length ? " has-slots" : ""}`}>
       <div className="npx-seqbuilder-head">
         <div className="npx-filter-label">Sequence query</div>
-        <button className="npx-btn npx-btn-ghost npx-btn-small npx-seq-add" onClick={addSlot}>
-          + Add slot
-        </button>
       </div>
+      <button className="npx-btn npx-btn-ghost npx-btn-small npx-seq-add" onClick={addSlot}>
+        + Add slot
+      </button>
       <p className="npx-filter-hint">Build a sequence of annotation slots. Phrases matching this ordered pattern will be returned.</p>
 
       {slots.length === 0 && (
@@ -867,7 +867,7 @@ export function Explore({ go, languages, languageById, annotationMeta, initialLa
               </label>
               <div className="npx-search-row">
                 <input id="npx-search" className="npx-input" placeholder="e.g. the house…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
-                <button type="submit" className="npx-btn npx-btn-small">Search</button>
+                <button type="submit" className="npx-btn npx-btn-ghost npx-btn-small">Search</button>
               </div>
               <p className="npx-filter-hint">Matches phrase text or its translation.</p>
             </form>
@@ -1889,12 +1889,12 @@ export function Style() {
       .npx-page { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
 
       /* Hero */
-      .npx-hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 56px; padding: 64px 0 56px; border-bottom: 1px solid var(--rule); }
+      .npx-hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 56px; padding: 64px 0 56px; border-bottom: 1px solid var(--rule); }
       .npx-eyebrow { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; color: var(--moss); margin: 0 0 14px; }
       .npx-h1 { font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1.15; margin: 0 0 20px; max-width: 20ch; }
       .npx-lede { font-size: 16px; color: var(--ink-soft); max-width: 46ch; margin: 0 0 28px; }
       .npx-lede-sm { font-size: 15px; color: var(--ink-soft); margin: 4px 0 0; }
-      .npx-hero-example { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 6px; padding: 24px; align-self: start; height: 320px; display: flex; flex-direction: column; }
+      .npx-hero-example { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 6px; padding: 24px; align-self: start; width: 100%; min-width: 0; height: 320px; min-height: 320px; max-height: 320px; overflow: hidden; display: flex; flex-direction: column; }
       .npx-hero-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-shrink: 0; }
       .npx-hero-card-header .npx-card-label { margin-bottom: 0; }
       .npx-hero-dots { display: flex; gap: 5px; align-items: center; }
@@ -1903,10 +1903,10 @@ export function Style() {
       .npx-hero-dot:hover { background: var(--indigo-light); }
       .npx-hero-fade { opacity: 0; transition: opacity 0.3s ease; flex: 1; display: flex; flex-direction: column; min-height: 0; }
       .npx-hero-fade.is-visible { opacity: 1; }
-      .npx-hero-igt-wrap { flex: 1; overflow: hidden; }
+      .npx-hero-igt-wrap { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
       .npx-hero-meta-footer { flex-shrink: 0; margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
       .npx-hero-meta-lang { display: flex; align-items: center; }
-      .npx-hero-meta-seq { font-family: var(--font-mono); font-size: 11px; color: var(--amber); background: var(--amber-bg); padding: 3px 9px; border-radius: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block; }
+      .npx-hero-meta-seq { align-self: flex-start; width: fit-content; font-family: var(--font-mono); font-size: 11px; color: var(--amber); background: var(--amber-bg); padding: 3px 9px; border-radius: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: inline-block; }
       .npx-hero-view-btn { margin-top: 8px; font-size: 13px; padding: 7px 14px; flex-shrink: 0; align-self: flex-start; }
       .npx-card-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-bottom: 14px; }
       .npx-hero-example-loading { color: var(--ink-soft); font-size: 14px; padding: 20px 0; }
