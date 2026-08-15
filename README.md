@@ -193,4 +193,40 @@ Preview the production build locally:
 npm run preview
 ```
 
+## Production deployment
+
+The public React application is deployed on Vercel and the protected FastAPI admin API is deployed as a separate Render web service. The admin URL is public, but every admin API request still requires a Supabase Auth user allowed by the server.
+
+### 1. Deploy the admin API
+
+Create a Render Blueprint from the repository's `render.yaml`. During the initial Blueprint setup, Render prompts for these values because they are declared with `sync: false`:
+
+- `NPINDEX_DATABASE_URL`: the server-only Supabase PostgreSQL connection string. Use the session pooler URL when the host requires IPv4 and include `sslmode=require`.
+- `SUPABASE_URL`: the Supabase project URL.
+- `SUPABASE_ANON_KEY`: the Supabase anonymous client key used to verify Auth access tokens.
+- `NPINDEX_ADMIN_EMAILS`: a comma-separated allowlist of administrator email addresses.
+- `NPINDEX_ADMIN_ORIGINS`: a comma-separated list of exact frontend origins, such as `https://your-project.vercel.app`, without trailing slashes.
+
+The Blueprint initially selects Render's free plan to avoid creating a paid resource automatically. Upgrade to an always-on plan before relying on long-running imports: migration progress and uploaded files are held in the service process while a job runs.
+
+After deployment, verify that `https://YOUR-RENDER-SERVICE.onrender.com/api/health` returns `{"status":"ok"}`.
+
+### 2. Configure and redeploy Vercel
+
+In the Vercel project, add this Production environment variable:
+
+```text
+VITE_MIGRATION_API_URL=https://YOUR-RENDER-SERVICE.onrender.com
+```
+
+Add it to Preview too only if preview deployments should access the production admin API. If so, add every permitted preview origin to `NPINDEX_ADMIN_ORIGINS`; CORS requires exact origins.
+
+Redeploy after changing the variable because Vite embeds `VITE_*` values at build time. The root `vercel.json` sends direct SPA routes such as `/admin` to `index.html`.
+
+### 3. Authorize and test an administrator
+
+Create or select a password-based user in Supabase Authentication. Ensure its email is present in `NPINDEX_ADMIN_EMAILS`, then visit `https://YOUR-VERCEL-DOMAIN/admin` in a private browser window and sign in. Verify Data management before running a CSV migration.
+
+Keep `NPINDEX_DATABASE_URL` and all database passwords exclusively on the backend host. `VITE_MIGRATION_API_URL` is only a public service URL and contains no credential.
+
 The Supabase URL and anonymous API key are currently configured near the top of `src/archive.jsx`. They are public client configuration; Supabase row-level security and table permissions determine which data the public application can read. PostgreSQL credentials remain exclusively in the migration API environment.

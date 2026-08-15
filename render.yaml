@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: npindex-admin-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r server/requirements.txt
+    startCommand: uvicorn server.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: NPINDEX_DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: NPINDEX_ADMIN_EMAILS
+        sync: false
+      - key: NPINDEX_ADMIN_ORIGINS
+        sync: false
+      - key: NPINDEX_MAX_UPLOAD_BYTES
+        value: "26214400"
