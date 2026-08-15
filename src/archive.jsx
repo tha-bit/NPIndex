@@ -1948,6 +1948,9 @@ export function Style() {
       .npx-btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
       .npx-btn-ghost:hover { background: var(--paper-dark); }
       .npx-btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+      .npx-btn-danger { border-color: #9C3B2E; background: #9C3B2E; color: white; }
+      .npx-btn-danger:hover { background: #7D2E24; }
+      .npx-btn-danger:disabled { cursor: not-allowed; opacity: 0.4; }
       .npx-btn-small { padding: 8px 12px; font-size: 13px; }
 
       /* Stats */
@@ -2227,12 +2230,15 @@ export function Style() {
       .npx-admin-actions .npx-btn:disabled { cursor: not-allowed; opacity: 0.4; }
       .npx-admin-message { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px; font-size: 13.5px; }
       .npx-admin-message.is-error { border-color: #C98F88; background: #F5E8E6; color: #7D2E24; }
+      .npx-admin-message.is-success { border-color: #A5BEA0; background: #E7EFE5; color: var(--moss); }
       .npx-admin-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
       .npx-admin-section-heading .npx-h3 { margin: 0; }
       .npx-admin-status { padding: 3px 8px; border-radius: 20px; background: var(--paper-dark); color: var(--ink-soft); font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; }
       .npx-admin-status.is-success, .npx-admin-status.is-completed { background: #D8E4D6; color: var(--moss); }
       .npx-admin-status.is-error, .npx-admin-status.is-failed, .npx-admin-status.is-completed_with_errors { background: #F5E8E6; color: #7D2E24; }
       .npx-admin-status.is-running { background: var(--indigo-bg); color: var(--indigo); }
+      .npx-admin-status.is-review_required { background: #F4E7C7; color: #765714; }
+      .npx-admin-status.is-canceled { background: var(--paper-dark); color: var(--ink-soft); }
       .npx-admin-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
       .npx-admin-summary-card { display: flex; flex-direction: column; padding: 12px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); }
       .npx-admin-summary-card strong { font-family: var(--font-display); font-size: 22px; }
@@ -2246,9 +2252,53 @@ export function Style() {
       .npx-admin-progress-label { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--ink-soft); font-size: 12.5px; }
       .npx-admin-results-table td:not(:first-child), .npx-admin-results-table th:not(:first-child) { text-align: right; }
       .npx-admin-failures { margin-top: 20px; }
+      .npx-admin-review-panel { border-color: #D1B56B; }
+      .npx-admin-review-panel .npx-eyebrow { margin-bottom: 5px; color: #765714; }
+      .npx-admin-review-intro { margin: 0 0 16px; color: var(--ink-soft); font-size: 13.5px; }
+      .npx-admin-review-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
+      .npx-admin-review-matches { display: flex; flex-direction: column; gap: 8px; }
+      .npx-admin-review-record { min-width: 0; padding: 14px; border: 1px solid var(--rule); border-radius: 5px; background: var(--paper); }
+      .npx-admin-review-record-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+      .npx-admin-review-record-title strong { font-family: var(--font-display); font-size: 14px; }
+      .npx-admin-review-record-title span { color: var(--indigo); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
+      .npx-admin-review-record dl { display: flex; flex-direction: column; gap: 7px; margin: 0; }
+      .npx-admin-review-record dl > div { display: grid; grid-template-columns: minmax(95px, 0.35fr) minmax(0, 1fr); gap: 10px; }
+      .npx-admin-review-record dt { color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
+      .npx-admin-review-record dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 12.5px; }
+      .npx-admin-review-match { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; border-radius: 5px; cursor: pointer; }
+      .npx-admin-review-match.is-static { grid-template-columns: minmax(0, 1fr); cursor: default; }
+      .npx-admin-review-match > input { margin-top: 16px; accent-color: var(--indigo); }
+      .npx-admin-review-match.is-selected .npx-admin-review-record { border-color: var(--indigo-light); background: var(--indigo-bg); }
+      .npx-admin-review-note { margin: 12px 0 0; color: var(--ink-soft); font-size: 12px; }
+      .npx-admin-review-batch { display: flex; align-items: center; gap: 7px; margin-top: 14px; color: var(--ink-soft); font-size: 12.5px; }
+      .npx-admin-review-batch input { accent-color: var(--indigo); }
+      .npx-admin-review-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+      .npx-admin-review-summary { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--rule); }
+      .npx-admin-review-summary > .npx-h3 { margin-bottom: 10px; }
       .npx-admin-login { max-width: 440px; margin: 40px auto; padding: 28px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper-raised); }
       .npx-admin-login-form { display: flex; flex-direction: column; gap: 14px; margin-top: 24px; }
       .npx-admin-login-form .npx-btn { align-self: flex-start; }
+      .npx-admin-data-controls { display: grid; grid-template-columns: minmax(180px, 260px) minmax(280px, 1fr); align-items: end; gap: 14px; }
+      .npx-admin-record-search { display: flex; align-items: flex-end; gap: 8px; }
+      .npx-admin-record-search .npx-filter-group { flex: 1; }
+      .npx-admin-data-note { margin: 12px 0 0; color: var(--ink-soft); font-size: 12.5px; }
+      .npx-admin-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .npx-admin-edit-grid .is-wide { grid-column: 1 / -1; }
+      .npx-admin-textarea { min-height: 84px; resize: vertical; font-family: var(--font-body); }
+      .npx-admin-record-editor code, .npx-admin-delete-panel code { color: var(--indigo); font-family: var(--font-mono); font-size: 12px; }
+      .npx-admin-delete-panel { border-color: #C98F88; }
+      .npx-admin-delete-panel > p { margin: 0 0 14px; color: var(--ink-soft); font-size: 13.5px; }
+      .npx-admin-delete-panel .npx-filter-group { max-width: 520px; }
+      .npx-admin-record-count { color: var(--ink-soft); font-family: var(--font-mono); font-size: 11.5px; }
+      .npx-admin-data-table { min-width: max-content; }
+      .npx-admin-data-table td { max-width: 260px; vertical-align: top; }
+      .npx-admin-data-table td > span { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .npx-admin-data-table th:last-child, .npx-admin-data-table td:last-child { position: sticky; right: 0; background: var(--paper-raised); box-shadow: -1px 0 var(--rule); }
+      .npx-admin-row-actions { display: flex; gap: 6px; }
+      .npx-admin-row-actions .npx-btn { padding: 5px 8px; font-size: 11.5px; }
+      .npx-admin-empty-records { padding: 24px !important; color: var(--ink-soft); text-align: center; }
+      .npx-admin-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 11.5px; }
+      .npx-admin-pagination > div { display: flex; gap: 6px; }
 
       .npx-footer { text-align: center; font-size: 12.5px; color: var(--ink-soft); padding: 32px 24px; border-top: 1px solid var(--rule); }
 
@@ -2276,6 +2326,13 @@ export function Style() {
         .npx-admin-header { flex-direction: column; }
         .npx-admin-account { width: 100%; justify-content: space-between; }
         .npx-admin-metadata, .npx-admin-role-files { grid-template-columns: 1fr; }
+        .npx-admin-review-comparison { grid-template-columns: 1fr; }
+        .npx-admin-review-actions { align-items: stretch; flex-direction: column; }
+        .npx-admin-review-actions .npx-btn { width: 100%; }
+        .npx-admin-data-controls, .npx-admin-edit-grid { grid-template-columns: 1fr; }
+        .npx-admin-edit-grid .is-wide { grid-column: auto; }
+        .npx-admin-record-search { align-items: stretch; flex-direction: column; }
+        .npx-admin-record-search .npx-btn { align-self: flex-start; }
         .npx-admin-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .npx-admin-actions { align-items: stretch; flex-direction: column; }
         .npx-admin-actions .npx-btn { width: 100%; }

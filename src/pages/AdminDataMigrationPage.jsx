@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminLogin, AdminPageHeader, adminRequest, useAdminSession } from "../components/AdminAccess.jsx";
 
 
-const TERMINAL_STATUSES = new Set(["completed", "completed_with_errors", "failed"]);
+const TERMINAL_STATUSES = new Set(["completed", "completed_with_errors", "failed", "canceled"]);
 const FILE_ROLES = [
   { key: "lexicon", label: "Lexicon table" },
   { key: "phrases", label: "Phrases table" },
@@ -39,6 +39,29 @@ function IssueList({ issues }) {
   );
 }
 
+function reviewFieldLabel(name) {
+  return name.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function ReviewRecord({ title, fields, matchedOn }) {
+  return (
+    <div className="npx-admin-review-record">
+      <div className="npx-admin-review-record-title">
+        <strong>{title}</strong>
+        {matchedOn && <span>{matchedOn}</span>}
+      </div>
+      <dl>
+        {Object.entries(fields || {}).map(([name, value]) => (
+          <div key={name}>
+            <dt>{reviewFieldLabel(name)}</dt>
+            <dd>{value === null || value === undefined || value === "" ? "—" : String(value)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 export default function AdminDataMigrationPage() {
   const { token, admin, authState, authenticate, signOut } = useAdminSession();
   const [files, setFiles] = useState({});
@@ -48,6 +71,20 @@ export default function AdminDataMigrationPage() {
   const [validating, setValidating] = useState(false);
   const [job, setJob] = useState(null);
   const [error, setError] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [selectedMatchId, setSelectedMatchId] = useState("");
+  const [applyToAll, setApplyToAll] = useState(false);
+
+  const pendingReviewItems = useMemo(
+    () => (job?.review?.items || []).filter((item) => !item.decision),
+    [job?.review?.items]
+  );
+  const currentReviewItem = pendingReviewItems[0] || null;
+
+  useEffect(() => {
+    setSelectedMatchId(currentReviewItem?.matches?.[0]?.id || "");
+    setApplyToAll(false);
+  }, [currentReviewItem?.id]);
 
   useEffect(() => {
     if (!job?.id || TERMINAL_STATUSES.has(job.status)) return undefined;
@@ -122,6 +159,31 @@ export default function AdminDataMigrationPage() {
     }
   };
 
+  const submitReviewDecision = async (action) => {
+    if (!currentReviewItem) return;
+    if (action === "cancel" && !window.confirm("Cancel this migration? No records from this migration will be imported.")) return;
+    setReviewSubmitting(true);
+    setError("");
+    try {
+      const nextJob = await adminRequest(`/api/admin/migrations/${job.id}/review`, token, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          review_id: currentReviewItem.id,
+          action,
+          match_id: action === "use_existing" ? selectedMatchId : null,
+          apply_to_all: currentReviewItem.kind === "exact_duplicate" && applyToAll,
+        }),
+      });
+      setJob(nextJob);
+    } catch (reviewError) {
+      if (reviewError.status === 401 || reviewError.status === 403) signOut();
+      setError(reviewError.message);
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   if (authState === "checking") {
     return <div className="npx-page npx-admin-page"><div className="npx-detail-loading">Checking administrator access…</div></div>;
   }
@@ -131,6 +193,7 @@ export default function AdminDataMigrationPage() {
 
   const isRunning = job && !TERMINAL_STATUSES.has(job.status);
   const result = job?.result;
+  const reviewSummary = result?.review_summary || job?.review_summary;
   const progress = job?.progress || { percent: 0, processed: 0, total: 0, message: "Ready." };
 
   return (
@@ -211,6 +274,75 @@ export default function AdminDataMigrationPage() {
         </section>
       )}
 
+      {job?.status === "review_required" && currentReviewItem && (
+        <section className="npx-admin-panel npx-admin-review-panel">
+          <div className="npx-admin-section-heading">
+            <div>
+              <p className="npx-eyebrow">Manual confirmation required</p>
+              <h2 className="npx-h3">{currentReviewItem.reason_label}</h2>
+            </div>
+            <span className="npx-admin-status is-review_required">
+              {pendingReviewItems.length} pending
+            </span>
+          </div>
+          <p className="npx-admin-review-intro">
+            Review the incoming {currentReviewItem.record_type} beside the closest existing database record{currentReviewItem.matches.length === 1 ? "" : "s"}.
+            No automatic merge or insert will occur until you decide.
+          </p>
+          <div className="npx-admin-review-comparison">
+            <ReviewRecord title="Incoming value" fields={currentReviewItem.incoming} />
+            <div className="npx-admin-review-matches">
+              {currentReviewItem.matches.map((match, index) => (
+                <label className={`npx-admin-review-match${selectedMatchId === match.id ? " is-selected" : ""}${currentReviewItem.kind === "similarity" ? "" : " is-static"}`} key={`${match.id}-${index}`}>
+                  {currentReviewItem.kind === "similarity" && (
+                    <input
+                      type="radio"
+                      name={`review-match-${currentReviewItem.id}`}
+                      value={match.id}
+                      checked={selectedMatchId === match.id}
+                      onChange={() => setSelectedMatchId(match.id)}
+                    />
+                  )}
+                  <ReviewRecord
+                    title={currentReviewItem.kind === "similarity" ? `Existing suggestion · ${Math.round((match.similarity || 0) * 100)}% similar` : "Existing database record"}
+                    fields={match.fields}
+                    matchedOn={match.matched_on}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {currentReviewItem.kind === "similarity" ? (
+            <>
+              <p className="npx-admin-review-note">
+                Skipping source or annotator metadata also skips its dependent import records because sessions require both values.
+              </p>
+              <div className="npx-admin-review-actions">
+                <button className="npx-btn npx-btn-primary" onClick={() => submitReviewDecision("use_existing")} disabled={reviewSubmitting || !selectedMatchId}>Use Existing Value</button>
+                <button className="npx-btn npx-btn-ghost" onClick={() => submitReviewDecision("use_imported")} disabled={reviewSubmitting}>Use Imported Value</button>
+                <button className="npx-btn npx-btn-ghost" onClick={() => submitReviewDecision("skip_record")} disabled={reviewSubmitting}>Skip Record</button>
+                <button className="npx-btn npx-btn-danger" onClick={() => submitReviewDecision("cancel")} disabled={reviewSubmitting}>Cancel Migration</button>
+              </div>
+            </>
+          ) : (
+            <>
+              {currentReviewItem.kind === "exact_duplicate" && pendingReviewItems.filter((item) => item.kind === "exact_duplicate").length > 1 && (
+                <label className="npx-admin-review-batch">
+                  <input type="checkbox" checked={applyToAll} onChange={(event) => setApplyToAll(event.target.checked)} />
+                  Apply this decision to all {pendingReviewItems.filter((item) => item.kind === "exact_duplicate").length} pending exact duplicates
+                </label>
+              )}
+              <div className="npx-admin-review-actions">
+                <button className="npx-btn npx-btn-ghost" onClick={() => submitReviewDecision("skip_duplicate")} disabled={reviewSubmitting}>Skip Duplicate and Continue</button>
+                <button className="npx-btn npx-btn-primary" onClick={() => submitReviewDecision("import_anyway")} disabled={reviewSubmitting}>Import Anyway</button>
+                <button className="npx-btn npx-btn-danger" onClick={() => submitReviewDecision("cancel")} disabled={reviewSubmitting}>Cancel Migration</button>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       {job && (
         <section className="npx-admin-panel">
           <div className="npx-admin-section-heading">
@@ -230,6 +362,20 @@ export default function AdminDataMigrationPage() {
             <div className="npx-admin-summary-card"><strong>{result?.skipped ?? 0}</strong><span>skipped</span></div>
             <div className="npx-admin-summary-card"><strong>{result?.failed ?? 0}</strong><span>failed</span></div>
           </div>
+          {reviewSummary?.total_flagged > 0 && (
+            <div className="npx-admin-review-summary">
+              <h3 className="npx-h3">Review summary</h3>
+              <div className="npx-admin-summary-grid">
+                <div className="npx-admin-summary-card"><strong>{reviewSummary.total_flagged}</strong><span>flagged</span></div>
+                <div className="npx-admin-summary-card"><strong>{reviewSummary.resolved}</strong><span>resolved</span></div>
+                <div className="npx-admin-summary-card"><strong>{reviewSummary.actions?.skip_duplicate || 0}</strong><span>duplicates skipped</span></div>
+                <div className="npx-admin-summary-card"><strong>{reviewSummary.actions?.import_anyway || 0}</strong><span>overrides imported</span></div>
+              </div>
+              <p className="npx-muted">
+                Existing values used: {reviewSummary.actions?.use_existing || 0} · Imported values confirmed: {reviewSummary.actions?.use_imported || 0} · Metadata records skipped: {reviewSummary.actions?.skip_record || 0}
+              </p>
+            </div>
+          )}
           {job.error && <div className="npx-admin-message is-error">{job.error}</div>}
           {result?.tables && (
             <div className="npx-table-wrap">

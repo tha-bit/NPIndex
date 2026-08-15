@@ -28,6 +28,12 @@ export default function AdminPage() {
           <p>Validate source CSV files and import lexicon, phrase, token, and annotation data into NPIndex.</p>
           <strong>Open Data Migration →</strong>
         </Link>
+        <Link className="npx-admin-tool-card" to="/admin/data-management">
+          <span className="npx-eyebrow">Database maintenance</span>
+          <h2 className="npx-h3">Data Management</h2>
+          <p>Find individual database records, correct field values, or safely remove records that are no longer required.</p>
+          <strong>Open Data Management →</strong>
+        </Link>
       </section>
     </div>
   );
