@@ -6,7 +6,6 @@ services:
     buildCommand: pip install -r server/requirements.txt
     startCommand: uvicorn server.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
-    maxShutdownDelaySeconds: 300
     envVars:
       - key: NPINDEX_DATABASE_URL
         sync: false
