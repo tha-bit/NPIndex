@@ -1,0 +1,26 @@
+phrase_id,phrase,phrase_translation,language,code,context,tag_sequence,saved_at
+PH-00001,Mi gato negro pequeño,my small black cat,Spanish,ES-2-01,Mi gato negro pequeño está durmiendo.,POSS-GEN → NOUN-ANIM → ADJ-INT-COLOR → ADJ-NINT-SIZE,2026-07-12T17:46:12.678Z
+PH-00002,Un gato blanco pequeño en la calle,A small white cat in the street,Spanish,ES-2-02,Vimos un gato blanco pequeño en la calle.,ART-INDEF → NOUN-ANIM → ADJ-INT-COLOR → ADJ-NINT-SIZE → PP,2026-07-12T17:48:25.996Z
+PH-00003,Muchos perros grandes,many big dogs,Spanish,ES-2-03,Muchos perros grandes ladran de noche.,QUANT-EXIST → NOUN-ANIM → ADJ-NINT-SIZE,2026-07-12T17:49:18.091Z
+PH-00004,Muchos perros callejeros en el refugio,many stray dogs in the shelter,Spanish,ES-2-04,Ella cuida a muchos perros callejeros en el refugio.,QUANT-EXIST → NOUN-ANIM → ADJ-NINT-QUAL → PP,2026-07-12T17:51:47.740Z
+PH-00005,Su nuevo coche rojo,His/her new red car,Spanish,ES-2-05,Su nuevo coche rojo es muy rápido.,POSS-GEN → ADJ-NINT-AGE → NOUN-INANIM-OBJECT → ADJ-INT-COLOR,2026-07-12T17:53:34.820Z
+PH-00006,Un nuevo coche eléctrico para la familia,a new electric car for the family,Spanish,ES-2-06,Compré un nuevo coche eléctrico para la familia.,ART-INDEF → ADJ-NINT-AGE → NOUN-INANIM-OBJECT → ADJ-NINT-QUAL → PP,2026-07-12T17:54:40.136Z
+PH-00007,Mis zapatos marrones viejos,my old brown shoes,Spanish,ES-2-07,Mis zapatos marrones viejos están rotos.,POSS-GEN → NOUN-INANIM-OBJECT → ADJ-INT-COLOR → ADJ-NINT-AGE,2026-07-12T17:56:03.546Z
+PH-00008,Unos zapatos negros viejos,some old black shoes,Spanish,ES-2-08,Tiré unos zapatos negros viejos al cubo.,ART-INDEF → NOUN-INANIM-OBJECT → ADJ-INT-COLOR → ADJ-NINT-AGE,2026-07-12T18:00:38.976Z
+PH-00009,Muchos libros interesantes,many interesting books,Spanish,ES-2-09,Hay muchos libros interesantes en la biblioteca.,QUANT-EXIST → NOUN-INANIM-OBJECT → ADJ-NINT-QUAL,2026-07-12T18:01:23.441Z
+PH-00010,Muchos libros antiguos sobre historia,many old books about history,Spanish,ES-2-10,Leí muchos libros antiguos sobre historia.,QUANT-EXIST → NOUN-INANIM-OBJECT → ADJ-NINT-AGE → PP,2026-07-12T18:03:27.989Z
+PH-00012,Una casa moderna grande con jardín,a big modern house with garden,Spanish,ES-2-12,Visitamos una casa moderna grande con jardín.,ART-INDEF → NOUN-INANIM-OBJ → ADJ-NINT-QUAL → ADJ-NINT-SIZE → PP,2026-07-12T18:05:41.737Z
+PH-00013,Nuestra mesa redonda pequeña,our small round table,Spanish,ES-2-13,Nuestra mesa redonda pequeña es de madera.,POSS-GEN → NOUN-INANIM-OBJECT → ADJ-INT-SHAPE → ADJ-NINT-SIZE,2026-07-12T18:07:59.520Z
+PH-00014,Tu casa blanca grande,your big white house,Spanish,ES-2-11,Tu casa blanca grande es hermosa.,POSS-GEN → NOUN-INANIM-OBJ → ADJ-INT-COLOR → ADJ-NINT-SIZE,2026-07-12T18:08:43.301Z
+PH-00015,La mesa cuadrada pequeña,the small squared table,Spanish,ES-2-14,Puse la mesa cuadrada pequeña en el rincón.,ART-DEF → NOUN-INANIM-OBJECT → ADJ-INT-SHAPE → ADJ-NINT-SIZE,2026-07-12T18:09:41.700Z
+PH-00016,Muchos niños felices,many happy children,Spanish,ES-2-15,Muchos niños felices juegan en el parque.,QUANT-EXIST → NOUN-ANIM → ADJ-NINT-QUAL,2026-07-12T18:10:56.616Z
+PH-00017,Mi amigo francés nuevo,My new French friend,Spanish,ES-2-17,Mi amigo francés nuevo habla español.,POSS-GEN → NOUN-ANIM → ADJ-INT-MAT → ADJ-NINT-AGE,2026-07-12T18:14:55.919Z
+PH-00018,Un amigo especial nuevo de la universidad,A new special friend from the university,Spanish,ES-2-18,Él es un amigo especial nuevo de la universidad.,ART-INDEF → NOUN-ANIM → ADJ-NINT-QUAL → ADJ-NINT-AGE → PP,2026-07-12T18:16:12.853Z
+PH-00019,Sus flores amarillas pequeñas,His/her/their small yellow flowers,Spanish,ES-2-19,Sus flores amarillas pequeñas huelen bien.,POSS-GEN → NOUN-ANIM → ADJ-INT-COLOR → ADJ-NINT-SIZE,2026-07-12T18:18:12.085Z
+PH-00020,Unas flores silvestres pequeñas,some small wild flowers,Spanish,ES-2-20,Recogí unas flores silvestres pequeñas del campo.,ART-INDEF → NOUN-ANIM → ADJ-NINT-QUAL → ADJ-NINT-SIZE,2026-07-12T18:19:10.585Z
+PH-00021,Nuestro perro gris viejo,our old grey dog,Spanish,ES-2-21,Nuestro perro gris viejo ya no corre.,POSS-GEN → NOUN-ANIM → ADJ-INT-COLOR → ADJ-NINT-AGE,2026-07-12T18:20:12.184Z
+PH-00022,Un perro ciego viejo del parque,an old blind dog from the park,Spanish,ES-2-22,Adoptaron a un perro ciego viejo del parque.,ART-INDEF → NOUN-ANIM → ADJ-NINT-QUAL → ADJ-NINT-AGE → PP,2026-07-12T18:21:24.334Z
+PH-00023,Muchos sueños raros,many strange dreams,Spanish,ES-2-23,Tengo muchos sueños raros últimamente.,QUANT-EXIST → NOUN-INANIM-OBJ → ADJ-NINT-QUAL,2026-07-12T18:22:07.501Z
+PH-00024,Muchos sueños vividos de su infancia,Many lived dreams from his/her childhood,Spanish,ES-2-24,Recordó muchos sueños vividos de su infancia.,QUANT-EXIST → NOUN-INANIM-OBJ → ADJ-NINT-QUAL → PP,2026-07-12T18:24:47.333Z
+PH-00025,Su coche azul nuevo,His/her/their new blue car,Spanish,ES-2-25,Su coche azul nuevo está aparcado fuera.,POSS-GEN → NOUN-INANIM-OBJECT → ADJ-INT-COLOR → ADJ-NINT-AGE,2026-07-12T18:25:44.833Z
+PH-00026,Muchos niños pequeños,many small children,Spanish,ES-2-16,Saludamos a muchos niños pequeños en la escuela.,QUANT-EXIST → NOUN-ANIM → ADJ-NINT-SIZE,2026-07-12T18:26:37.366Z

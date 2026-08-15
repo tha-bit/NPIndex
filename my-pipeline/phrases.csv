@@ -1,0 +1,3 @@
+﻿"phrase_id","phrase","phrase_translation","language","code","context","tag_sequence","saved_at"
+"PH-00001","The heavy iron table","bu ağır metal masa","Turko","EN-2-03","The heavy iron table is hard to move.","ART-DEF → ADJ-NINT-QUAL → ADJ-INT-MAT → NOUN-INANIM-OBJECT","2026-07-12T13:44:14.174Z"
+"PH-00002","The small wooden box","bu küçük tahta kutu","Turko","EN-2-01","I found the small wooden box in the attic.","ART-DEF → ADJ-NINT-SIZE → ADJ-INT-MAT → NOUN-INANIM-OBJ","2026-07-12T13:45:08.521Z"
