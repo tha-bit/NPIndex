@@ -38,6 +38,22 @@ export async function sb(path, { range, count } = {}) {
   return { data, total };
 }
 
+export async function signInWithPassword(email, password) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.access_token) {
+    throw new Error(payload.error_description || payload.msg || payload.message || "Sign-in failed.");
+  }
+  return payload;
+}
+
 const enc = (v) => encodeURIComponent(v);
 
 function buildSearchFilter(value) {
@@ -2182,6 +2198,49 @@ export function Style() {
       .npx-heat-rowtotal { background: var(--paper-raised) !important; border-left: 2px solid var(--rule); font-weight: 600; color: var(--ink-soft); }
       .npx-heat-zero { color: var(--rule); font-size: 16px; }
 
+      /* Admin data migration */
+      .npx-admin-page { padding-top: 40px; }
+      .npx-admin-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+      .npx-admin-header .npx-eyebrow, .npx-admin-login .npx-eyebrow { margin-bottom: 8px; }
+      .npx-admin-account { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); font-size: 13px; }
+      .npx-admin-panel { margin-bottom: 18px; padding: 20px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper-raised); }
+      .npx-admin-panel > .npx-h3 { margin-bottom: 14px; }
+      .npx-admin-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .npx-admin-role-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+      .npx-admin-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 104px; padding: 16px; border: 1px dashed var(--rule); border-radius: 6px; background: var(--paper); cursor: pointer; text-align: center; }
+      .npx-admin-upload:hover, .npx-admin-upload.has-files { border-color: var(--indigo-light); background: var(--indigo-bg); }
+      .npx-admin-upload input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+      .npx-admin-upload strong { font-family: var(--font-display); font-size: 15px; }
+      .npx-admin-upload span { max-width: 100%; margin-top: 5px; overflow: hidden; color: var(--ink-soft); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+      .npx-admin-upload small { margin-top: 3px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 10.5px; }
+      .npx-admin-file-summary { margin-top: 10px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 11.5px; }
+      .npx-admin-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+      .npx-admin-actions .npx-btn:disabled { cursor: not-allowed; opacity: 0.4; }
+      .npx-admin-message { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px; font-size: 13.5px; }
+      .npx-admin-message.is-error { border-color: #C98F88; background: #F5E8E6; color: #7D2E24; }
+      .npx-admin-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+      .npx-admin-section-heading .npx-h3 { margin: 0; }
+      .npx-admin-status { padding: 3px 8px; border-radius: 20px; background: var(--paper-dark); color: var(--ink-soft); font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; }
+      .npx-admin-status.is-success, .npx-admin-status.is-completed { background: #D8E4D6; color: var(--moss); }
+      .npx-admin-status.is-error, .npx-admin-status.is-failed, .npx-admin-status.is-completed_with_errors { background: #F5E8E6; color: #7D2E24; }
+      .npx-admin-status.is-running { background: var(--indigo-bg); color: var(--indigo); }
+      .npx-admin-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+      .npx-admin-summary-card { display: flex; flex-direction: column; padding: 12px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); }
+      .npx-admin-summary-card strong { font-family: var(--font-display); font-size: 22px; }
+      .npx-admin-summary-card span { color: var(--ink-soft); font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; }
+      .npx-admin-issues { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+      .npx-admin-issues li { padding: 8px 10px; border-left: 3px solid var(--rule); background: var(--paper); font-size: 13px; }
+      .npx-admin-issues li.is-error { border-left-color: #9C3B2E; color: #7D2E24; }
+      .npx-admin-issues li.is-warning { border-left-color: var(--amber); color: var(--amber); }
+      .npx-admin-progress { height: 8px; overflow: hidden; border-radius: 4px; background: var(--paper-dark); }
+      .npx-admin-progress > div { height: 100%; border-radius: inherit; background: var(--indigo); transition: width 0.25s ease; }
+      .npx-admin-progress-label { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--ink-soft); font-size: 12.5px; }
+      .npx-admin-results-table td:not(:first-child), .npx-admin-results-table th:not(:first-child) { text-align: right; }
+      .npx-admin-failures { margin-top: 20px; }
+      .npx-admin-login { max-width: 440px; margin: 40px auto; padding: 28px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper-raised); }
+      .npx-admin-login-form { display: flex; flex-direction: column; gap: 14px; margin-top: 24px; }
+      .npx-admin-login-form .npx-btn { align-self: flex-start; }
+
       .npx-footer { text-align: center; font-size: 12.5px; color: var(--ink-soft); padding: 32px 24px; border-top: 1px solid var(--rule); }
 
       @media (prefers-reduced-motion: reduce) {
@@ -2205,6 +2264,12 @@ export function Style() {
         .npx-language-dropdown-panel { position: static; width: auto; max-height: 180px; margin-top: 4px; box-shadow: none; }
         .npx-filter-bar .npx-seq-slot-fields { grid-template-columns: 1fr; }
         .npx-results-controls { flex-wrap: wrap; }
+        .npx-admin-header { flex-direction: column; }
+        .npx-admin-account { width: 100%; justify-content: space-between; }
+        .npx-admin-metadata, .npx-admin-role-files { grid-template-columns: 1fr; }
+        .npx-admin-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .npx-admin-actions { align-items: stretch; flex-direction: column; }
+        .npx-admin-actions .npx-btn { width: 100%; }
       }
     `}</style>
   );

@@ -1,5 +1,8 @@
-node_modules
-dist
-.vscode
-.DS_Store
 .env
+.env.local
+__pycache__/
+*.py[cod]
+.venv/
+my-pipeline/.venv/
+node_modules/
+dist/

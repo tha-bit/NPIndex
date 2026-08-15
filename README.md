@@ -19,12 +19,13 @@ Key capabilities:
 - Inspect phrase details, token glosses, contexts, annotations, and provenance.
 - Export the current Explore result set as CSV.
 - Compare annotation distributions and ordered annotation sequences across languages.
+- Validate and run protected CSV data migrations from the admin interface.
 
 ## 2. Technology Stack
 
 - **Frontend:** React 18
 - **Build tool:** Vite 5 with `@vitejs/plugin-react`
-- **Backend/API:** No application server. The frontend calls Supabase PostgREST directly.
+- **Backend/API:** Public reads call Supabase PostgREST directly. A separate FastAPI service handles authenticated admin migrations and runs the Python pipeline server-side.
 - **Database/storage:** Supabase tables, including phrases, tokens, annotations, languages, sessions, contexts, sources, and annotators.
 - **Browser APIs:** `fetch` for data access, React portals for help popovers, pointer events for slot reordering, and Blob/download APIs for CSV export.
 - **Styling:** Component-local CSS emitted by the `Style` component in `src/app.jsx`, plus the global stylesheet in `src/index.css`.
@@ -36,12 +37,14 @@ Key capabilities:
 .
 ├── index.html          # Vite HTML entry point
 ├── package.json        # Dependencies and npm scripts
+├── server/             # Protected FastAPI migration API
+├── my-pipeline/        # CSV validation, transformation, and PostgreSQL import commands
 ├── vite.config.js      # Vite and React plugin configuration
 ├── src/
 │   ├── main.jsx        # React root and StrictMode bootstrap
 │   ├── app.jsx         # Browser routing, shared data loading, and app shell
 │   ├── archive.jsx     # Shared data helpers, view implementations, and styles
-│   ├── pages/          # Route-level About, Languages, Explore, Statistics, and Detail pages
+│   ├── pages/          # Route-level public pages and protected admin migration page
 │   └── index.css       # Global base styles
 └── README.md           # Project and coding-agent guide
 ```
@@ -69,11 +72,11 @@ Route definitions and shared application data loading live in `src/app.jsx`. Exi
 The main search and filtering workspace.
 
 - **Search wording:** Searches phrase text and translations using the shared `buildSearchFilter` operator parser.
-- **Language filter:** Multi-select language checkboxes.
+- **Language filter:** Compact multi-select language dropdown.
 - **Sequence Query:** Builds an ordered annotation pattern. Each slot can constrain category, subcategory, type, and an optional token word.
 - **Sequence slot word search:** Uses the same operators as the main search field and matches annotation tokens.
 - **Slot ordering:** Drag the handle to reorder slots, or use the Up and Down arrow buttons. Both paths update the same `slots` state used by sequence matching.
-- **Sorting:** Sort by phrase, language, or ID, with ascending/descending direction.
+- **Sorting:** Click the Phrase or Language table header to switch field or direction.
 - **Results:** Paginated phrase table with language, structure, and lazily loaded context.
 - **CSV export:** Exports all rows matching the current language, text, and sequence filters, including language metadata and context.
 - **Detail navigation:** Clicking a result opens the full record view.
@@ -95,6 +98,26 @@ The main search and filtering workspace.
 - Display proportional breakdown bars.
 - Inspect ordered annotation-pair heatmaps at category, subcategory, or type level.
 - Filter sequence statistics by category and subcategory.
+
+### Admin data migration
+
+`/admin/data-migration` is not linked from the public navigation. Supabase Auth signs the administrator in, and every migration API endpoint independently verifies the access token and requires either an `app_metadata.role` of `admin`, an `admin` entry in `app_metadata.roles`, or an email in the server-side `NPINDEX_ADMIN_EMAILS` allowlist.
+
+The page accepts the pipeline's four CSV files (lexicon, phrases, tokens, and annotations), identifies them by headers, validates required values and cross-file references, checks languages against `public.languages`, and displays migration progress plus processed, successful, skipped, and failed counts.
+
+The pipeline writes in foreign-key order:
+
+1. Existing languages are resolved (languages are never created implicitly).
+2. Source and annotator metadata are resolved or inserted.
+3. Lexicon and gloss records are upserted.
+4. Sessions and contexts are upserted.
+5. Phrases are upserted.
+6. Tokens are upserted.
+7. Annotations are upserted.
+
+IDs are deterministic from source, language, and stable source identifiers. Reimporting the same dataset targets the same records instead of creating another copy. Database failures are isolated with savepoints and reported by table and input row.
+
+`my-pipeline/clean_tables.py` is a separate destructive maintenance command. It is not callable through the API and requires an exact CLI confirmation phrase.
 
 ## 5. AI Agent Guidance
 
@@ -127,6 +150,37 @@ Start the development server:
 npm run dev
 ```
 
+Create a Python environment and install the migration API dependencies:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r server/requirements.txt
+```
+
+Copy `.env.example` to `.env`, then set:
+
+- `NPINDEX_DATABASE_URL`: the server-only Supabase PostgreSQL connection string, normally with `sslmode=require`.
+- `SUPABASE_URL` and `SUPABASE_ANON_KEY`: used server-side to verify submitted Auth tokens.
+- `NPINDEX_ADMIN_EMAILS`: optional comma-separated server-side admin allowlist. Prefer an admin role in Supabase Auth `app_metadata` for production.
+- `NPINDEX_ADMIN_ORIGINS`: allowed frontend origins.
+- `VITE_MIGRATION_API_URL`: the public URL of the migration API; this is a URL only, never a credential.
+
+Start the migration API (the command loads the local `.env` file):
+
+```bash
+npm run api
+```
+
+For a CLI validation without database access:
+
+```bash
+python3 my-pipeline/import_pipeline.py --validate-only \
+  --source "Corpus name" --annotator "Full name" \
+  lexicon.csv phrases.csv tokens.csv annotations.csv
+```
+
+Remove `--validate-only` and set `NPINDEX_DATABASE_URL` to perform the same import through the CLI. Do not set database passwords or privileged keys in a `VITE_*` variable.
+
 Create a production build:
 
 ```bash
@@ -139,4 +193,4 @@ Preview the production build locally:
 npm run preview
 ```
 
-The Supabase URL and anonymous API key are currently configured near the top of `src/app.jsx`. Supabase row-level security and table permissions determine which data the public application can read.
+The Supabase URL and anonymous API key are currently configured near the top of `src/archive.jsx`. They are public client configuration; Supabase row-level security and table permissions determine which data the public application can read. PostgreSQL credentials remain exclusively in the migration API environment.

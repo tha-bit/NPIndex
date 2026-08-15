@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api": ".venv/bin/python -m uvicorn server.app:app --reload --port 8000 --env-file .env"
   },
   "dependencies": {
     "react": "^18.3.1",
