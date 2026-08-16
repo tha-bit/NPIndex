@@ -45,7 +45,14 @@ export default function AdminDataManagementPage() {
   useEffect(() => {
     if (authState !== "authenticated") return;
     adminRequest("/api/admin/data-management/tables", token)
-      .then(({ tables: availableTables }) => {
+      .then((payload) => {
+        const availableTables = payload.tables;
+        const hasValidTables = Array.isArray(availableTables) && availableTables.every(
+          (table) => table && typeof table.name === "string" && Array.isArray(table.columns)
+        );
+        if (!hasValidTables) {
+          throw new Error("The admin API returned an invalid table list.");
+        }
         setTables(availableTables);
         setTableName((current) => (
           availableTables.some((table) => table.name === current) ? current : availableTables[0]?.name || ""
@@ -67,8 +74,11 @@ export default function AdminDataManagementPage() {
     adminRequest(`/api/admin/data-management/${encodeURIComponent(tableName)}?${parameters}`, token)
       .then((payload) => {
         if (cancelled) return;
-        setItems(payload.items || []);
-        setTotal(payload.total || 0);
+        if (!Array.isArray(payload.items) || !Number.isFinite(Number(payload.total))) {
+          throw new Error("The admin API returned an invalid record list.");
+        }
+        setItems(payload.items);
+        setTotal(Number(payload.total));
       })
       .catch((requestError) => {
         if (!cancelled) handleRequestError(requestError);

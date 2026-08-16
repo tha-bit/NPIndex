@@ -14,7 +14,9 @@ export async function adminRequest(path, token, options = {}) {
       ...(options.headers || {}),
     },
   });
-  const payload = await response.json().catch(() => ({}));
+  const contentType = response.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+  const payload = isJson ? await response.json().catch(() => ({})) : {};
   if (!response.ok) {
     const detail = payload?.detail;
     const message = typeof detail === "string"
@@ -24,6 +26,9 @@ export async function adminRequest(path, token, options = {}) {
     error.status = response.status;
     error.payload = payload;
     throw error;
+  }
+  if (!isJson) {
+    throw new Error("The admin API returned an unexpected response. Check VITE_MIGRATION_API_URL in the deployed frontend.");
   }
   return payload;
 }
