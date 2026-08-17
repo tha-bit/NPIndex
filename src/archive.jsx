@@ -1337,17 +1337,18 @@ export function Statistics({ languages, languageById, annotationMeta }) {
   // Tab: "categories" | "subcategories" | "types" | "sequences"
   const [tab, setTab] = useState("categories");
 
-  // Language search for sidebar
-  const [langSearch, setLangSearch] = useState("");
+  const statLanguageDropdownRef = useRef(null);
 
   // Filters for subcategory/type tabs
   const [filterCat, setFilterCat] = useState("");
   const [filterSubcat, setFilterSubcat] = useState("");
 
-  // Filters for sequences tab: level to display and optional narrowing
+  // Filters for sequences tab: level to display and independent endpoint narrowing
   const [seqLevel, setSeqLevel] = useState("category"); // "category" | "subcategory" | "type"
-  const [seqFilterCat, setSeqFilterCat] = useState("");
-  const [seqFilterSubcat, setSeqFilterSubcat] = useState("");
+  const [seqRowFilterCat, setSeqRowFilterCat] = useState("");
+  const [seqRowFilterSubcat, setSeqRowFilterSubcat] = useState("");
+  const [seqColFilterCat, setSeqColFilterCat] = useState("");
+  const [seqColFilterSubcat, setSeqColFilterSubcat] = useState("");
 
   const toggleLang = (id) => {
     setSelected((prev) => {
@@ -1394,11 +1395,36 @@ export function Statistics({ languages, languageById, annotationMeta }) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  useEffect(() => {
+    const closeLanguageDropdown = (event) => {
+      if (!statLanguageDropdownRef.current?.contains(event.target)) {
+        statLanguageDropdownRef.current?.removeAttribute("open");
+      }
+    };
+    const closeLanguageDropdownOnEscape = (event) => {
+      if (event.key !== "Escape" || !statLanguageDropdownRef.current?.open) return;
+      statLanguageDropdownRef.current.removeAttribute("open");
+      statLanguageDropdownRef.current.querySelector("summary")?.focus();
+    };
+    document.addEventListener("mousedown", closeLanguageDropdown);
+    document.addEventListener("keydown", closeLanguageDropdownOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeLanguageDropdown);
+      document.removeEventListener("keydown", closeLanguageDropdownOnEscape);
+    };
+  }, []);
+
   // Reset sub-filters when tab changes
   useEffect(() => { setFilterCat(""); setFilterSubcat(""); }, [tab]);
   useEffect(() => { setFilterSubcat(""); }, [filterCat]);
-  useEffect(() => { setSeqFilterCat(""); setSeqFilterSubcat(""); }, [seqLevel]);
-  useEffect(() => { setSeqFilterSubcat(""); }, [seqFilterCat]);
+  useEffect(() => {
+    setSeqRowFilterCat("");
+    setSeqRowFilterSubcat("");
+    setSeqColFilterCat("");
+    setSeqColFilterSubcat("");
+  }, [seqLevel]);
+  useEffect(() => { setSeqRowFilterSubcat(""); }, [seqRowFilterCat]);
+  useEffect(() => { setSeqColFilterSubcat(""); }, [seqColFilterCat]);
 
   // ── Derived data ─────────────────────────────────────────────
 
@@ -1466,13 +1492,11 @@ export function Statistics({ languages, languageById, annotationMeta }) {
   // annotation at position j > i within the same phrase (all ordered pairs,
   // not just adjacent ones). Repeats of the same label in different positions
   // are treated as separate occurrences.
-  function getSeqCounts(langId, level, catFilter, subcatFilter) {
+  function getSeqCounts(langId, level, rowFilters, colFilters) {
     const rows = rawData[langId] || [];
     const byPhrase = {};
     rows.forEach((a) => {
       if (!a.phrase_id) return;
-      if (catFilter && a.category !== catFilter) return;
-      if (subcatFilter && a.subcategory !== subcatFilter) return;
       let label = null;
       if (level === "category") label = a.category;
       else if (level === "subcategory") label = a.subcategory;
@@ -1487,6 +1511,10 @@ export function Statistics({ languages, languageById, annotationMeta }) {
       // All ordered pairs (i, j) where j > i
       for (let i = 0; i < sorted.length; i++) {
         for (let j = i + 1; j < sorted.length; j++) {
+          if (rowFilters.category && sorted[i].category !== rowFilters.category) continue;
+          if (rowFilters.subcategory && sorted[i].subcategory !== rowFilters.subcategory) continue;
+          if (colFilters.category && sorted[j].category !== colFilters.category) continue;
+          if (colFilters.subcategory && sorted[j].subcategory !== colFilters.subcategory) continue;
           const from = sorted[i]._label;
           const to = sorted[j]._label;
           if (from && to) {
@@ -1604,42 +1632,57 @@ export function Statistics({ languages, languageById, annotationMeta }) {
   }
 
   function renderSequenceTab() {
-    // Collect all labels across selected languages for current level+filters
     function getSeqLabelValue(a) {
       if (seqLevel === "category") return a.category;
       if (seqLevel === "subcategory") return a.subcategory;
       return a.type;
     }
 
-    const rowsFromSelection = selected.flatMap((id) => (rawData[id] || []).filter((a) => {
-      if (seqFilterCat && a.category !== seqFilterCat) return false;
-      if (seqFilterSubcat && a.subcategory !== seqFilterSubcat) return false;
-      return true;
-    }));
+    function matchesSeqFilters(a, category, subcategory) {
+      return (!category || a.category === category) &&
+        (!subcategory || a.subcategory === subcategory);
+    }
 
-    const metadataLabels = (() => {
-      if (seqLevel === "category") return metadataCategories;
-      if (seqLevel === "subcategory") return seqFilterCat ? (metadataSubcatsByCat[seqFilterCat] || []) : [];
-      return seqFilterCat
-        ? (seqFilterSubcat
-          ? (metadataTypesByCatAndSubcat[seqFilterCat]?.[seqFilterSubcat] || [])
-          : (metadataTypesByCat[seqFilterCat] || []))
+    function getSeqMetadataLabels(category, subcategory) {
+      if (seqLevel === "category") return category ? [category] : metadataCategories;
+      if (seqLevel === "subcategory") {
+        if (subcategory) return [subcategory];
+        return category ? (metadataSubcatsByCat[category] || []) : [];
+      }
+      return category
+        ? (subcategory
+          ? (metadataTypesByCatAndSubcat[category]?.[subcategory] || [])
+          : (metadataTypesByCat[category] || []))
         : [];
-    })();
+    }
 
-    const allSeqLabels = [...new Set([
-      ...metadataLabels,
-      ...rowsFromSelection.map((a) => getSeqLabelValue(a)).filter(Boolean)
-    ])].sort();
+    function getSeqLabels(category, subcategory) {
+      const observedLabels = selected.flatMap((id) => (rawData[id] || [])
+        .filter((a) => matchesSeqFilters(a, category, subcategory))
+        .map((a) => getSeqLabelValue(a)).filter(Boolean));
+      return [...new Set([
+        ...getSeqMetadataLabels(category, subcategory),
+        ...observedLabels
+      ])].sort();
+    }
+
+    const seqRowLabels = getSeqLabels(seqRowFilterCat, seqRowFilterSubcat);
+    const seqColLabels = getSeqLabels(seqColFilterCat, seqColFilterSubcat);
 
     // Derive available cats/subcats for the filter dropdowns from shared metadata and observed rows
     const seqAllCats = [...new Set([...(metadataCategories || []), ...selected.flatMap((id) => (rawData[id] || []).map((a) => a.category).filter(Boolean))])].sort();
-    const seqAllSubcats = seqFilterCat ? [...new Set([
-      ...(metadataSubcatsByCat[seqFilterCat] || []),
-      ...selected.flatMap((id) => (rawData[id] || [])
-        .filter((a) => a.category === seqFilterCat)
-        .map((a) => a.subcategory).filter(Boolean))
-    ])].sort() : [];
+    function getSeqSubcats(category) {
+      if (!category) return [];
+      return [...new Set([
+        ...(metadataSubcatsByCat[category] || []),
+        ...selected.flatMap((id) => (rawData[id] || [])
+          .filter((a) => a.category === category)
+          .map((a) => a.subcategory).filter(Boolean))
+      ])].sort();
+    }
+    const seqRowSubcats = getSeqSubcats(seqRowFilterCat);
+    const seqColSubcats = getSeqSubcats(seqColFilterCat);
+    const hasSeqFilters = seqRowFilterCat || seqRowFilterSubcat || seqColFilterCat || seqColFilterSubcat;
 
     return (
       <div>
@@ -1656,40 +1699,72 @@ export function Statistics({ languages, languageById, annotationMeta }) {
               ))}
             </div>
           </div>
-          <div className="npx-seq-control-group">
-            <span className="npx-filter-label">Narrow by category</span>
-            <select className="npx-select npx-select-sm" value={seqFilterCat} onChange={(e) => setSeqFilterCat(e.target.value)}>
-              <option value="">All</option>
-              {seqAllCats.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          {seqFilterCat && (
+          <div className="npx-seq-axis-group" role="group" aria-labelledby="npx-seq-row-label">
+            <span id="npx-seq-row-label" className="npx-seq-axis-label">Rows (from)</span>
             <div className="npx-seq-control-group">
-              <span className="npx-filter-label">Narrow by subcategory</span>
-              <select className="npx-select npx-select-sm" value={seqFilterSubcat} onChange={(e) => setSeqFilterSubcat(e.target.value)}>
-                <option value="">All</option>
-                {seqAllSubcats.map((s) => <option key={s} value={s}>{s}</option>)}
+              <label className="npx-filter-label" htmlFor="npx-seq-row-category">Category</label>
+              <select id="npx-seq-row-category" className="npx-select npx-select-sm" value={seqRowFilterCat} onChange={(e) => setSeqRowFilterCat(e.target.value)}>
+                <option value="">All categories</option>
+                {seqAllCats.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-          )}
-          {(seqFilterCat || seqFilterSubcat) && (
-            <button className="npx-clear-filter-link" onClick={() => { setSeqFilterCat(""); setSeqFilterSubcat(""); }}>× clear filters</button>
+            {seqRowFilterCat && (
+              <div className="npx-seq-control-group">
+                <label className="npx-filter-label" htmlFor="npx-seq-row-subcategory">Subcategory</label>
+                <select id="npx-seq-row-subcategory" className="npx-select npx-select-sm" value={seqRowFilterSubcat} onChange={(e) => setSeqRowFilterSubcat(e.target.value)}>
+                  <option value="">All subcategories</option>
+                  {seqRowSubcats.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+          <div className="npx-seq-axis-group" role="group" aria-labelledby="npx-seq-column-label">
+            <span id="npx-seq-column-label" className="npx-seq-axis-label">Columns (to)</span>
+            <div className="npx-seq-control-group">
+              <label className="npx-filter-label" htmlFor="npx-seq-column-category">Category</label>
+              <select id="npx-seq-column-category" className="npx-select npx-select-sm" value={seqColFilterCat} onChange={(e) => setSeqColFilterCat(e.target.value)}>
+                <option value="">All categories</option>
+                {seqAllCats.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            {seqColFilterCat && (
+              <div className="npx-seq-control-group">
+                <label className="npx-filter-label" htmlFor="npx-seq-column-subcategory">Subcategory</label>
+                <select id="npx-seq-column-subcategory" className="npx-select npx-select-sm" value={seqColFilterSubcat} onChange={(e) => setSeqColFilterSubcat(e.target.value)}>
+                  <option value="">All subcategories</option>
+                  {seqColSubcats.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+          {hasSeqFilters && (
+            <button className="npx-clear-filter-link" onClick={() => {
+              setSeqRowFilterCat("");
+              setSeqRowFilterSubcat("");
+              setSeqColFilterCat("");
+              setSeqColFilterSubcat("");
+            }}>× clear filters</button>
           )}
         </div>
 
         <p className="npx-filter-hint" style={{ marginBottom: 20 }}>
           Each cell shows how many times the <em>row</em> {seqLevel} precedes the <em>column</em> {seqLevel} anywhere within a phrase — not just in adjacent positions.
           For a phrase A › B › C, this counts A→B, A→C, and B→C.
-          {seqFilterCat && <> Filtered to <strong>{seqFilterCat}</strong>{seqFilterSubcat ? <> › <strong>{seqFilterSubcat}</strong></> : ""} annotations only.</>}
+          {hasSeqFilters && <> Row and column filters apply only to their respective side of the sequence.</>}
           {" "}Repeated labels (e.g. two Nouns) are counted as separate occurrences.
         </p>
 
-        {allSeqLabels.length === 0 && (
+        {(seqRowLabels.length === 0 || seqColLabels.length === 0) && (
           <div className="npx-empty"><div className="npx-empty-title">No {seqLevel} data for these filters</div></div>
         )}
 
-        {allSeqLabels.length > 0 && selected.map((id, li) => {
-          const bigrams = getSeqCounts(id, seqLevel, seqFilterCat, seqFilterSubcat);
+        {seqRowLabels.length > 0 && seqColLabels.length > 0 && selected.map((id, li) => {
+          const bigrams = getSeqCounts(
+            id,
+            seqLevel,
+            { category: seqRowFilterCat, subcategory: seqRowFilterSubcat },
+            { category: seqColFilterCat, subcategory: seqColFilterSubcat }
+          );
           const matMax = Math.max(1, ...Object.values(bigrams).filter((v) => isFinite(v)));
           const langName = languageById[id]?.language_name || id;
           const color = STAT_COLORS[li];
@@ -1705,19 +1780,19 @@ export function Statistics({ languages, languageById, annotationMeta }) {
                   <thead>
                     <tr>
                       <th className="npx-heat-corner">from ↓ / to →</th>
-                      {allSeqLabels.map((lbl) => (
+                      {seqColLabels.map((lbl) => (
                         <th key={lbl} className="npx-heat-th">{lbl}</th>
                       ))}
                       <th className="npx-heat-th npx-heat-total">Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {allSeqLabels.map((from) => {
-                      const rowTotal = allSeqLabels.reduce((s, to) => s + (bigrams[from + "|||" + to] || 0), 0);
+                    {seqRowLabels.map((from) => {
+                      const rowTotal = seqColLabels.reduce((s, to) => s + (bigrams[from + "|||" + to] || 0), 0);
                       return (
                         <tr key={from}>
                           <td className="npx-heat-rowlabel">{from}</td>
-                          {allSeqLabels.map((to) => (
+                          {seqColLabels.map((to) => (
                             <HeatCell key={to} value={bigrams[from + "|||" + to] || 0} max={matMax} color={color} />
                           ))}
                           <td className="npx-heat-cell npx-heat-rowtotal">{rowTotal > 0 ? rowTotal : <span className="npx-heat-zero">·</span>}</td>
@@ -1744,49 +1819,39 @@ export function Statistics({ languages, languageById, annotationMeta }) {
       </div>
 
       <div className="npx-stat-layout">
-        <aside className="npx-stat-sidebar">
-          <div className="npx-filter-label">
-            Select languages
-            <span className="npx-filter-badge">{selected.length}/{MAX_LANGS}</span>
+        <section className="npx-stat-language-bar" aria-label="Language selection">
+          <div className="npx-filter-group npx-stat-language-filter">
+            <div className="npx-filter-label">
+              Language
+              <span className="npx-filter-badge">{selected.length}/{MAX_LANGS}</span>
+            </div>
+            <details className="npx-language-dropdown" ref={statLanguageDropdownRef}>
+              <summary className="npx-language-dropdown-toggle">
+                <span>{selected.length > 0 ? `${selected.length} selected` : "Choose languages"}</span>
+                <span className="npx-language-dropdown-arrow" aria-hidden="true">▾</span>
+              </summary>
+              <div className="npx-lang-checks npx-language-dropdown-panel">
+                {languages.map((l) => {
+                  const id = String(l.language_id);
+                  const isSelected = selected.includes(id);
+                  const disabled = !isSelected && selected.length >= MAX_LANGS;
+                  return (
+                    <label key={l.language_id} className={"npx-check-row" + (disabled ? " npx-check-disabled" : "")}>
+                      <input
+                        type="checkbox"
+                        className="npx-checkbox"
+                        checked={isSelected}
+                        disabled={disabled}
+                        onChange={() => toggleLang(id)}
+                      />
+                      <span className="npx-check-label">{l.language_name}</span>
+                      {l.iso_code && <span className="npx-check-iso">{l.iso_code}</span>}
+                    </label>
+                  );
+                })}
+              </div>
+            </details>
           </div>
-          <input
-            className="npx-input"
-            placeholder="Type to find a language…"
-            value={langSearch}
-            onChange={(e) => setLangSearch(e.target.value)}
-            style={{ fontSize: 13, padding: "6px 10px" }}
-          />
-          <div className="npx-lang-checks" style={{ maxHeight: 260 }}>
-            {languages
-              .filter((l) => {
-                if (!langSearch.trim()) return true;
-                const q = langSearch.toLowerCase();
-                return l.language_name?.toLowerCase().includes(q) || l.iso_code?.toLowerCase().includes(q);
-              })
-              .map((l) => {
-                const sel = selected.includes(String(l.language_id));
-                const disabled = !sel && selected.length >= MAX_LANGS;
-                const idx = selected.indexOf(String(l.language_id));
-                return (
-                  <label key={l.language_id}
-                    className={"npx-check-row" + (disabled ? " npx-check-disabled" : "")}
-                    style={sel ? { borderLeft: "3px solid " + STAT_COLORS[idx], paddingLeft: 6 } : {}}
-                  >
-                    <input type="checkbox" className="npx-checkbox" checked={sel} disabled={disabled}
-                      onChange={() => toggleLang(String(l.language_id))} />
-                    <span className="npx-check-label">{l.language_name}</span>
-                    {l.iso_code && <span className="npx-check-iso">{l.iso_code}</span>}
-                  </label>
-                );
-              })}
-          </div>
-
-          {selected.length > 0 && (
-            <button className="npx-btn npx-btn-ghost npx-btn-small npx-clear" onClick={() => setSelected([])}>
-              Clear selection
-            </button>
-          )}
-
           {selected.length > 0 && (
             <div className="npx-stat-legend">
               {selected.map((id, i) => (
@@ -1797,13 +1862,16 @@ export function Statistics({ languages, languageById, annotationMeta }) {
               ))}
             </div>
           )}
-        </aside>
+          {selected.length > 0 && (
+            <button className="npx-clear-filter-link" onClick={() => setSelected([])}>× clear</button>
+          )}
+        </section>
 
         <main className="npx-stat-main">
           {selected.length === 0 && (
             <div className="npx-empty">
               <div className="npx-empty-title">Select up to 4 languages to compare</div>
-              <div className="npx-empty-body">Choose languages from the panel on the left.</div>
+              <div className="npx-empty-body">Choose languages using the filter above.</div>
             </div>
           )}
 
@@ -2171,10 +2239,11 @@ export function Style() {
       .npx-export-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
       /* Statistics page */
-      .npx-stat-layout { display: grid; grid-template-columns: 240px 1fr; gap: 40px; align-items: start; }
-      .npx-stat-sidebar { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 16px; max-height: calc(100vh - 90px); overflow-y: auto; padding-bottom: 16px; }
-      .npx-stat-legend { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--rule); }
-      .npx-legend-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+      .npx-stat-layout { display: flex; flex-direction: column; }
+      .npx-stat-language-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 24px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 6px; background: rgba(248, 246, 239, 0.55); }
+      .npx-stat-language-filter { flex: 0 1 210px; width: 210px; }
+      .npx-stat-legend { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 180px; min-height: 32px; }
+      .npx-legend-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
       .npx-legend-swatch { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
       .npx-check-disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -2213,6 +2282,8 @@ export function Style() {
       /* Sequence tab controls */
       .npx-seq-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; margin-bottom: 20px; padding: 14px 16px; background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 6px; }
       .npx-seq-control-group { display: flex; flex-direction: column; gap: 5px; }
+      .npx-seq-axis-group { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding-left: 16px; border-left: 1px solid var(--rule); }
+      .npx-seq-axis-label { align-self: center; font-family: var(--font-display); font-size: 12px; font-weight: 600; color: var(--ink-soft); }
       .npx-seg-btns { display: flex; gap: 4px; }
 
       /* Stacked proportion bars */
@@ -2359,6 +2430,7 @@ export function Style() {
         .npx-filter-actions { align-self: flex-start; order: 3; }
         .npx-language-dropdown-panel { position: static; width: auto; max-height: 180px; margin-top: 4px; box-shadow: none; }
         .npx-filter-bar .npx-seq-slot-fields { grid-template-columns: 1fr; }
+        .npx-seq-axis-group { width: 100%; padding-top: 12px; padding-left: 0; border-top: 1px solid var(--rule); border-left: 0; }
         .npx-results-controls { flex-wrap: wrap; }
         .npx-admin-header { flex-direction: column; }
         .npx-admin-account { width: 100%; justify-content: space-between; }
