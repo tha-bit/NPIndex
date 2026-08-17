@@ -906,7 +906,7 @@ def run_import(
                 f"{language['iso']}-S-", *identity_parts
             )
 
-        gloss_id_by_value: dict[str, str] = {}
+        gloss_id_by_value: dict[tuple[str, str], str] = {}
         _emit(progress, stage="glosses", message="Resolving glosses.", percent=20)
         for row in rows["tokens"]:
             gloss = row.get("gloss")
@@ -915,20 +915,27 @@ def run_import(
             language_row = next(item for item in rows["phrases"] if str(item["phrase_id"]) == old_phrase_id)
             language_key = str(language_row["language"]).strip().casefold()
             lexicon_id = lexicon_id_map.get((language_key, old_lexicon_id))
-            if not gloss or not lexicon_id or str(gloss) in gloss_id_by_value:
+            if not gloss or not lexicon_id:
+                continue
+            gloss_value = str(gloss)
+            gloss_key = (gloss_value, lexicon_id)
+            if gloss_key in gloss_id_by_value:
                 continue
             existing_gloss_id = connection.execute(
-                text("SELECT gloss_id FROM public.glosses WHERE gloss = :gloss LIMIT 1"),
-                {"gloss": str(gloss)},
+                text(
+                    "SELECT gloss_id FROM public.glosses "
+                    "WHERE gloss = :gloss AND lexicon_id = :lexicon_id LIMIT 1"
+                ),
+                {"gloss": gloss_value, "lexicon_id": lexicon_id},
             ).scalar_one_or_none()
             if existing_gloss_id:
-                gloss_id_by_value[str(gloss)] = existing_gloss_id
+                gloss_id_by_value[gloss_key] = existing_gloss_id
                 gloss_stats = result.table("glosses")
                 gloss_stats.processed += 1
                 gloss_stats.skipped += 1
                 continue
             language = language_by_name[language_key]
-            gloss_id = _stable_id(f"{language['iso']}-GL-", lexicon_id, gloss)
+            gloss_id = _stable_id(f"{language['iso']}-GL-", lexicon_id, gloss_value)
             if _execute_row(
                 connection,
                 result,
@@ -938,16 +945,19 @@ def run_import(
                 text(
                     """INSERT INTO public.glosses (gloss_id, gloss, lexicon_id, language_id)
                        VALUES (:id, :gloss, :lexicon_id, :language_id)
-                       ON CONFLICT (gloss) DO NOTHING"""
+                       ON CONFLICT (gloss_id) DO UPDATE SET
+                         gloss = EXCLUDED.gloss,
+                         lexicon_id = EXCLUDED.lexicon_id,
+                         language_id = EXCLUDED.language_id"""
                 ),
                 {
                     "id": gloss_id,
-                    "gloss": str(gloss),
+                    "gloss": gloss_value,
                     "lexicon_id": lexicon_id,
                     "language_id": language["id"],
                 },
             ):
-                gloss_id_by_value[str(gloss)] = gloss_id
+                gloss_id_by_value[gloss_key] = gloss_id
 
         _emit(progress, stage="phrases", message="Importing sessions, contexts, and phrases.", percent=25)
         for row_number, row in enumerate(rows["phrases"], start=2):
@@ -1095,7 +1105,7 @@ def run_import(
                     "id": token_id,
                     "token": row["word_form"],
                     "gloss": row.get("gloss"),
-                    "gloss_id": gloss_id_by_value.get(str(row.get("gloss"))),
+                    "gloss_id": gloss_id_by_value.get((str(row.get("gloss")), lexicon_id)),
                     "lexicon_id": lexicon_id,
                     "phrase_id": phrase_id,
                 },
