@@ -216,12 +216,17 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function HighlightPhrase({ text, phrase }) {
-  if (!text) return null;
-  const rawPhrase = String(phrase || "").trim();
-  if (!rawPhrase) return <>{text}</>;
+const WORD_CHARS = "\\p{L}\\p{M}\\p{N}";
 
-  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(rawPhrase)}(?![\\p{L}\\p{N}])`, "giu");
+function flexibleTokenPattern(token) {
+  return Array.from(token, (character) => {
+    if (["'", "’", "ʼ"].includes(character)) return "['’ʼ]";
+    if (["-", "‐", "‑"].includes(character)) return "[-‐‑]";
+    return escapeRegExp(character);
+  }).join("");
+}
+
+function renderHighlightedMatches(text, pattern) {
   const parts = [];
   let lastIndex = 0;
   let match;
@@ -234,11 +239,43 @@ function HighlightPhrase({ text, phrase }) {
     lastIndex = match.index + match[0].length;
   }
 
-  if (parts.length === 0) return <>{text}</>;
+  if (parts.length === 0) return null;
   if (lastIndex < text.length) {
     parts.push(<React.Fragment key={`tail-${lastIndex}`}>{text.slice(lastIndex)}</React.Fragment>);
   }
-  return <>{parts}</>;
+  return parts;
+}
+
+function HighlightPhrase({ text, phrase }) {
+  if (!text) return null;
+  const rawPhrase = String(phrase || "").trim();
+  if (!rawPhrase) return <>{text}</>;
+
+  const exactPattern = new RegExp(`(?<![${WORD_CHARS}])${escapeRegExp(rawPhrase)}(?![${WORD_CHARS}])`, "giu");
+  const exactMatches = renderHighlightedMatches(text, exactPattern);
+  if (exactMatches) return <>{exactMatches}</>;
+
+  const phraseTokens = rawPhrase.split(/\s+/u);
+  if (phraseTokens.length < 2) return <>{text}</>;
+
+  const tokenPatterns = phraseTokens.map(flexibleTokenPattern);
+  const phrasePattern = tokenPatterns.join("\\s+");
+  const surfacePattern = new RegExp(`(?<![${WORD_CHARS}])${phrasePattern}(?![${WORD_CHARS}])`, "giu");
+  const surfaceMatches = renderHighlightedMatches(text, surfacePattern);
+  if (surfaceMatches) return <>{surfaceMatches}</>;
+
+  const prefixPattern = tokenPatterns.slice(0, -1).join("\\s+");
+  const finalTokenPattern = tokenPatterns.at(-1);
+  const suffixPattern = `(?:[${WORD_CHARS}]|['’ʼ\\-‐‑](?=[${WORD_CHARS}]))+`;
+  const extendedPattern = new RegExp(
+    `(?<![${WORD_CHARS}])${prefixPattern}\\s+${finalTokenPattern}${suffixPattern}(?![${WORD_CHARS}])`,
+    "giu"
+  );
+  const extendedMatches = renderHighlightedMatches(text, extendedPattern);
+  if (extendedMatches) {
+    return <>{extendedMatches}</>;
+  }
+  return <>{text}</>;
 }
 
 /* ============================================================
