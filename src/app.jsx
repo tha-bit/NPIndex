@@ -31,6 +31,7 @@ const VIEW_PATHS = {
   statistics: "/statistics",
 };
 
+const SITE_ORIGIN = "https://npdb.vercel.app";
 const DEFAULT_META_DESCRIPTION = "Explore the Noun Phrase Index, a cross-linguistic research archive of noun phrases with word-level glosses, translations, annotations, and source data.";
 
 const META_DESCRIPTIONS = {
@@ -50,6 +51,11 @@ function getMetaDescription(pathname) {
   return META_DESCRIPTIONS[pathname] || DEFAULT_META_DESCRIPTION;
 }
 
+function getCanonicalPath(pathname) {
+  if (pathname.startsWith("/explore/")) return pathname;
+  return META_DESCRIPTIONS[pathname] ? pathname : "/";
+}
+
 function AppRoutes() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,6 +71,14 @@ function AppRoutes() {
       document.head.appendChild(metaDescription);
     }
     metaDescription.content = getMetaDescription(location.pathname);
+
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (!canonicalLink) {
+      canonicalLink = document.createElement("link");
+      canonicalLink.rel = "canonical";
+      document.head.appendChild(canonicalLink);
+    }
+    canonicalLink.href = new URL(getCanonicalPath(location.pathname), SITE_ORIGIN).href;
   }, [location.pathname]);
 
   useEffect(() => {

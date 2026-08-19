@@ -88,8 +88,8 @@ function buildSearchFilter(value) {
    ============================================================ */
 function Dots() {
   return (
-    <span className="npx-dots" aria-label="Loading">
-      <span /><span /><span />
+    <span className="npx-dots" role="status" aria-label="Loading">
+      <span aria-hidden="true" /><span aria-hidden="true" /><span aria-hidden="true" />
     </span>
   );
 }
@@ -292,12 +292,13 @@ export function Header({ view, go }) {
             <span className="npx-brand-sub">a cross-linguistic archive</span>
           </span>
         </button>
-        <nav className="npx-nav">
+        <nav className="npx-nav" aria-label="Primary navigation">
           {["home", "languages", "explore", "statistics"].map((v) => (
             <button
               key={v}
               className={`npx-nav-link ${view === v ? "is-active" : ""}`}
               onClick={() => go(v)}
+              aria-current={view === v ? "page" : undefined}
             >
               {v === "home" ? "About" : v === "statistics" ? "Statistics" : v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
@@ -584,10 +585,11 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
               <div
                 className="npx-seq-slot-handle"
                 title="Drag to reorder"
+                aria-hidden="true"
                 onPointerDown={(e) => onPointerDown(e, i)}
               >⠿</div>
               <div className="npx-seq-slot-num">{i + 1}</div>
-              <div className="npx-seq-slot-arrows" aria-label={`Reorder slot ${i + 1}`}>
+              <div className="npx-seq-slot-arrows" role="group" aria-label={`Reorder slot ${i + 1}`}>
                 <button
                   type="button"
                   className="npx-seq-arrow"
@@ -608,6 +610,7 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
               <div className="npx-seq-slot-fields">
                 <select
                   className="npx-select npx-select-sm"
+                  aria-label={`Slot ${i + 1} category`}
                   value={slot.category}
                   onChange={(e) => updateSlot(i, "category", e.target.value)}
                 >
@@ -616,6 +619,7 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
                 </select>
                 <select
                   className="npx-select npx-select-sm"
+                  aria-label={`Slot ${i + 1} subcategory`}
                   value={slot.subcategory}
                   onChange={(e) => updateSlot(i, "subcategory", e.target.value)}
                   disabled={!slot.category || subcatOptions.length === 0}
@@ -625,6 +629,7 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
                 </select>
                 <select
                   className="npx-select npx-select-sm"
+                  aria-label={`Slot ${i + 1} type`}
                   value={slot.type}
                   onChange={(e) => updateSlot(i, "type", e.target.value)}
                   disabled={!slot.category || typeOptions.length === 0}
@@ -635,6 +640,7 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
                 <div className="npx-seq-word-row">
                   <input
                     className="npx-input npx-select-sm npx-seq-word-input"
+                    aria-label={`Slot ${i + 1} word filter`}
                     placeholder="word (optional)"
                     value={slot.word || ""}
                     onChange={(e) => updateSlot(i, "word", e.target.value)}
@@ -642,11 +648,11 @@ function SequenceBuilder({ slots, setSlots, annotationMeta }) {
                   />
                   <SearchTips />
                   {slot.word && (
-                    <button className="npx-seq-remove" style={{ fontSize: 13 }} onClick={() => updateSlot(i, "word", "")} title="Clear word">×</button>
+                    <button className="npx-seq-remove" style={{ fontSize: 13 }} onClick={() => updateSlot(i, "word", "")} title="Clear word" aria-label={`Clear slot ${i + 1} word filter`}>×</button>
                   )}
                 </div>
               </div>
-              <button className="npx-seq-remove" onClick={() => removeSlot(i)} title="Remove slot">×</button>
+              <button className="npx-seq-remove" onClick={() => removeSlot(i)} title="Remove slot" aria-label={`Remove slot ${i + 1}`}>×</button>
             </div>
           );
         })}
@@ -975,9 +981,15 @@ export function Explore({ go, languages, languageById, annotationMeta, initialLa
                 : <span>&nbsp;</span>}
             </div>
             <div className="npx-results-controls">
-              <label className="npx-filter-label" style={{margin:0}}>Rows</label>
+              <span className="npx-filter-label" style={{margin:0}}>Rows</span>
               {PAGE_SIZES.map((n) => (
-                <button key={n} className={`npx-pagesize-btn ${pageSize === n ? "is-active" : ""}`} onClick={() => setPageSize(n)}>{n}</button>
+                <button
+                  key={n}
+                  className={`npx-pagesize-btn ${pageSize === n ? "is-active" : ""}`}
+                  onClick={() => setPageSize(n)}
+                  aria-label={`Show ${n} rows per page`}
+                  aria-pressed={pageSize === n}
+                >{n}</button>
               ))}
               <button
                 className="npx-btn npx-btn-ghost npx-btn-small npx-export-btn"
@@ -1080,7 +1092,19 @@ function ResultRow({ row, languageById, go }) {
 
   return (
     <tr className="npx-result-row" onClick={() => go("detail", row.phrase_id)}>
-      <td className="npx-result-main">{row.phrase_main || "—"}</td>
+      <td className="npx-result-main">
+        <a
+          className="npx-result-link"
+          href={`/explore/${encodeURIComponent(row.phrase_id)}`}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            go("detail", row.phrase_id);
+          }}
+        >
+          {row.phrase_main || "View phrase record"}
+        </a>
+      </td>
       <td className="npx-result-translation">{row.phrase_translation ? `'${row.phrase_translation}'` : "—"}</td>
       <td>{lang ? <Tag tone="indigo">{lang.language_name}</Tag> : "—"}</td>
       <td className="npx-result-catseq">
@@ -1260,7 +1284,7 @@ export function Languages({ go, languages }) {
         <h1 className="npx-h1-sm">Languages</h1>
         <p className="npx-lede-sm">{languages.length} language{languages.length !== 1 ? "s" : ""} in the archive.</p>
       </div>
-      <input className="npx-input npx-lang-search-input" placeholder="Filter by name or ISO code…" value={langSearch} onChange={(e) => setLangSearch(e.target.value)} style={{ marginBottom: 24, maxWidth: 320 }} />
+      <input className="npx-input npx-lang-search-input" aria-label="Filter languages by name or ISO code" placeholder="Filter by name or ISO code…" value={langSearch} onChange={(e) => setLangSearch(e.target.value)} style={{ marginBottom: 24, maxWidth: 320 }} />
       <div className="npx-lang-grid">
         {filtered.map((l) => {
           const count = langStats[l.language_id];
@@ -1695,6 +1719,7 @@ export function Statistics({ languages, languageById, annotationMeta }) {
                 <button key={lvl}
                   className={"npx-pagesize-btn" + (seqLevel === lvl ? " is-active" : "")}
                   onClick={() => setSeqLevel(lvl)}
+                  aria-pressed={seqLevel === lvl}
                 >{lvl}</button>
               ))}
             </div>
@@ -1879,7 +1904,7 @@ export function Statistics({ languages, languageById, annotationMeta }) {
             <>
               <div className="npx-stat-tabs">
                 {["categories", "subcategories", "types", "sequences"].map((t) => (
-                  <button key={t} className={"npx-stat-tab" + (tab === t ? " is-active" : "")} onClick={() => setTab(t)}>
+                  <button key={t} className={"npx-stat-tab" + (tab === t ? " is-active" : "")} onClick={() => setTab(t)} aria-pressed={tab === t}>
                     {t.charAt(0).toUpperCase() + t.slice(1)}
                   </button>
                 ))}
@@ -1901,7 +1926,7 @@ export function Statistics({ languages, languageById, annotationMeta }) {
                     <div className="npx-seq-controls">
                       <div className="npx-seq-control-group">
                         <span className="npx-filter-label">Filter by category</span>
-                        <select className="npx-select npx-select-sm" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
+                        <select className="npx-select npx-select-sm" aria-label="Filter subcategory statistics by category" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
                           <option value="">All categories</option>
                           {allCats.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -1927,7 +1952,7 @@ export function Statistics({ languages, languageById, annotationMeta }) {
                     <div className="npx-seq-controls">
                       <div className="npx-seq-control-group">
                         <span className="npx-filter-label">Filter by category</span>
-                        <select className="npx-select npx-select-sm" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
+                        <select className="npx-select npx-select-sm" aria-label="Filter type statistics by category" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
                           <option value="">All categories</option>
                           {allCats.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -1935,7 +1960,7 @@ export function Statistics({ languages, languageById, annotationMeta }) {
                       {filterCat && (
                         <div className="npx-seq-control-group">
                           <span className="npx-filter-label">Filter by subcategory</span>
-                          <select className="npx-select npx-select-sm" value={filterSubcat} onChange={(e) => setFilterSubcat(e.target.value)}>
+                          <select className="npx-select npx-select-sm" aria-label="Filter type statistics by subcategory" value={filterSubcat} onChange={(e) => setFilterSubcat(e.target.value)}>
                             <option value="">All subcategories</option>
                             {allSubcats.map((s) => <option key={s} value={s}>{s}</option>)}
                           </select>
@@ -2174,6 +2199,8 @@ export function Style() {
       .npx-result-row:hover { background: var(--paper-raised); }
       .npx-result-row:last-child td { border-bottom: none; }
       .npx-result-main { font-family: var(--font-display); font-size: 15px; font-weight: 500; }
+      .npx-result-link { color: inherit; font: inherit; font-weight: inherit; text-align: left; cursor: pointer; text-decoration: none; }
+      .npx-result-link:hover { text-decoration: underline; }
       .npx-result-translation { font-style: italic; color: var(--ink-soft); font-size: 13.5px; }
       .npx-result-context { font-size: 13px; color: var(--ink-soft); max-width: 300px; }
       .npx-ctx-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

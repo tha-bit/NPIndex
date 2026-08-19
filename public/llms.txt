@@ -1,0 +1,22 @@
+# Noun Phrase Index
+
+> A cross-linguistic research archive for exploring noun phrases, translations, token-level glosses, grammatical annotations, context, provenance, and language metadata.
+
+The Noun Phrase Index presents public linguistic research data collected from natural speech and text. Use the public pages below to browse languages, search phrase records, and compare annotation distributions. Restricted administration routes are not part of the public research content.
+
+## Public pages
+
+- [About the archive](https://npdb.vercel.app/): Learn what the Noun Phrase Index contains and how its records are organised.
+- [Explore noun phrases](https://npdb.vercel.app/explore): Search phrase wording and translations, filter by language, and build ordered grammatical annotation queries.
+- [Languages](https://npdb.vercel.app/languages): Browse the languages represented in the archive and open their phrase records.
+- [Statistics](https://npdb.vercel.app/statistics): Compare annotation distributions and ordered annotation sequences across languages.
+
+## Using the data
+
+- Phrase records can include translations, token-level glosses, structural annotations, corpus context, source details, annotator information, and language metadata.
+- Explore search supports ordinary contains matching, quoted exact searches, prefix searches ending in `*`, and contains searches surrounded by `*`.
+- The Explore page can export the currently filtered public result set as CSV.
+
+## Optional
+
+- [Source repository](https://github.com/tha-bit/NPIndex): Application source code and project documentation.

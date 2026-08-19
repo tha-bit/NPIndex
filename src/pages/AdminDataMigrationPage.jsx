@@ -349,7 +349,14 @@ export default function AdminDataMigrationPage() {
             <h2 className="npx-h3">Migration status</h2>
             <span className={`npx-admin-status is-${job.status}`}>{job.status.replaceAll("_", " ")}</span>
           </div>
-          <div className="npx-admin-progress" aria-label={`Migration ${progress.percent}% complete`}>
+          <div
+            className="npx-admin-progress"
+            role="progressbar"
+            aria-label="Migration progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow={progress.percent || 0}
+          >
             <div style={{ width: `${progress.percent || 0}%` }} />
           </div>
           <div className="npx-admin-progress-label">
