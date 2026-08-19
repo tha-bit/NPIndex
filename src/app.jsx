@@ -31,12 +31,41 @@ const VIEW_PATHS = {
   statistics: "/statistics",
 };
 
+const DEFAULT_META_DESCRIPTION = "Explore the Noun Phrase Index, a cross-linguistic research archive of noun phrases with word-level glosses, translations, annotations, and source data.";
+
+const META_DESCRIPTIONS = {
+  "/": DEFAULT_META_DESCRIPTION,
+  "/languages": "Browse languages represented in the Noun Phrase Index and open their noun phrase records, translations, glosses, and grammatical annotations.",
+  "/explore": "Search cross-linguistic noun phrases by wording, translation, language, and grammatical annotation sequence in the Noun Phrase Index research archive.",
+  "/statistics": "Compare noun phrase annotation distributions and ordered grammatical sequences across languages in the Noun Phrase Index research archive worldwide.",
+  "/admin": "Access protected Noun Phrase Index administration tools for authorised data management and migration workflows.",
+  "/admin/data-management": "Find, correct, or remove individual Noun Phrase Index database records through the protected administration interface.",
+  "/admin/data-migration": "Validate and import Noun Phrase Index lexicon, phrase, token, and annotation data through the protected administration interface.",
+};
+
+function getMetaDescription(pathname) {
+  if (pathname.startsWith("/explore/")) {
+    return "View a noun phrase record with its translation, token-level glosses, grammatical annotations, context, source, language, and provenance details.";
+  }
+  return META_DESCRIPTIONS[pathname] || DEFAULT_META_DESCRIPTION;
+}
+
 function AppRoutes() {
   const navigate = useNavigate();
   const location = useLocation();
   const [languages, setLanguages] = useState([]);
   const [languageById, setLanguageById] = useState({});
   const [annotationMeta, setAnnotationMeta] = useState(EMPTY_ANNOTATION_META);
+
+  useEffect(() => {
+    let metaDescription = document.querySelector('meta[name="description"]');
+    if (!metaDescription) {
+      metaDescription = document.createElement("meta");
+      metaDescription.name = "description";
+      document.head.appendChild(metaDescription);
+    }
+    metaDescription.content = getMetaDescription(location.pathname);
+  }, [location.pathname]);
 
   useEffect(() => {
     const link = document.createElement("link");
